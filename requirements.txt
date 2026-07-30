@@ -1,0 +1,7 @@
+requests
+pandas
+openpyxl
+feedparser
+matplotlib
+python-dotenv
+psycopg
