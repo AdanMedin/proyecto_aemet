@@ -5,3 +5,4 @@ feedparser
 matplotlib
 python-dotenv
 psycopg
+ipykernel
