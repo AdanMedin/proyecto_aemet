@@ -1,0 +1,9 @@
+requests
+pandas
+openpyxl
+feedparser
+matplotlib
+python-dotenv
+psycopg
+ipykernel
+scikit-learn
