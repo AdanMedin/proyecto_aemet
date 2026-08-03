@@ -19,7 +19,7 @@ CREATE TABLE meteo.estaciones (
     longitud     NUMERIC(9,6),
 
     CONSTRAINT chk_altitud_valida
-        CHECK (altitud IS NULL OR altitud >= -200),
+        CHECK (altitud IS NULL OR altitud BETWEEN -200 AND 8850),
     CONSTRAINT chk_latitud_valida
         CHECK (latitud IS NULL OR latitud BETWEEN -90 AND 90),
     CONSTRAINT chk_longitud_valida
@@ -35,6 +35,8 @@ CREATE TABLE meteo.mediciones_diarias (
     indicativo   VARCHAR(10) NOT NULL,
     tmed         NUMERIC(4,1),
     prec         NUMERIC(6,1),
+    precAcum     BOOLEAN,
+    precIp       BOOLEAN,
     tmin         NUMERIC(4,1),
     tmax         NUMERIC(4,1),
     dir          SMALLINT,
@@ -46,6 +48,7 @@ CREATE TABLE meteo.mediciones_diarias (
     hrmedia      SMALLINT,
     hrmax        SMALLINT,
     hrmin        SMALLINT,
+    variasHoras  BOOLEAN,
     pintmax      NUMERIC(6,1),
 
     -- Clave primaria compuesta (obligatoria en tabla particionada: debe incluir la columna de partición)
@@ -109,6 +112,6 @@ CREATE VIEW meteo.ultimos_10_dias AS
 SELECT
     indicativo,
     fecha,
-    tmed, prec, tmin, tmax, hrmedia, sol, velmedia, racha, dir, presmax, presmin, hrmax, hrmin, pintmax
+    tmed, prec, tmin, tmax, hrmedia, sol, velmedia, racha, dir, presmax, presmin, hrmax, hrmin, pintmax, precAcum, variasHoras, precIp
 FROM meteo.mediciones_diarias
 WHERE fecha >= CURRENT_DATE - INTERVAL '10 days';

@@ -217,4 +217,8 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Virtual environments
 .venv/
+
+# Resources
+resources/
