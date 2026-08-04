@@ -7,3 +7,5 @@ python-dotenv
 psycopg
 ipykernel
 scikit-learn
+xgboost
+seaborn
