@@ -218,3 +218,5 @@ __marimo__/
 .streamlit/secrets.toml
 
 ALL_10_YEARS
+modelos_GB/
+modelos_RF/
