@@ -1,0 +1,6 @@
+{
+  // Oculta los __init__.py del explorador de archivos.
+  // Siguen existiendo en disco (son necesarios como paquetes de Python),
+  "files.exclude": {
+    "**/__init__.py": true
+}

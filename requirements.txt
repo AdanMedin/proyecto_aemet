@@ -1,9 +1,33 @@
-requests
+# --- API ---
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+
+# --- Base de datos ---
+sqlalchemy
+psycopg[binary]
+asyncpg
+
+# --- Datos / ML ---
 pandas
-openpyxl
-feedparser
-matplotlib
-python-dotenv
-psycopg
-ipykernel
+numpy
 scikit-learn
+joblib
+openpyxl
+
+# --- Ingesta AEMET ---
+requests
+feedparser
+python-dotenv
+
+# --- Frontend ---
+streamlit
+matplotlib
+
+# --- Notebooks ---
+ipykernel
+
+# --- Tests ---
+pytest
+httpx
