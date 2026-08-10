@@ -1,0 +1,19 @@
+# Entornos y cachés de Python
+.venv/
+**/__pycache__/
+**/*.pyc
+
+# Control de versiones y config local
+.git/
+.gitignore
+.env
+
+# Datos pesados y modelos (no hacen falta en la imagen; se montan por volumen)
+proyecto_aemet_api/resources/
+proyecto_aemet_api/ml/artifacts/*.joblib
+
+# Cosas que no necesita la API en runtime
+tests/
+streamlit_app/
+**/*.ipynb
+*.md

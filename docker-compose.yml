@@ -12,6 +12,31 @@ services:
     volumes:
       - aemet_pgdata:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      # La API esperara a que este "healthy" antes de arrancar.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aemet} -d ${POSTGRES_DB:-aemet}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    container_name: aemet_api
+    restart: unless-stopped
+    environment:
+      # Dentro de Docker el host de la BD es "postgres" (el nombre del servicio), no "localhost". Esquema postgresql:// porque la app usa asyncpg.
+      DATABASE_DSN: postgresql://${POSTGRES_USER:-aemet}:${POSTGRES_PASSWORD:-aemet}@postgres:5432/${POSTGRES_DB:-aemet}
+      RUTA_MODELOS: proyecto_aemet_api/ml/artifacts
+    ports:
+      - "8000:8000"
+    volumes:
+      # Modelos entrenados desde el host, sin reconstruir la imagen.
+      - ./proyecto_aemet_api/ml/artifacts:/app/proyecto_aemet_api/ml/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   pgadmin:
     image: dpage/pgadmin4
