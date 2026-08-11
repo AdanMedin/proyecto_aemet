@@ -1,10 +1,8 @@
 """Punto de entrada de la aplicación FastAPI."""
+
 from __future__ import annotations
-
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
-
 from proyecto_aemet_api.app.api.v1.router import api_router
 from proyecto_aemet_api.core.config import get_settings
 from proyecto_aemet_api.database.repositories.observation_repository import (
@@ -18,7 +16,6 @@ from proyecto_aemet_api.ml.predictor import (
     crear_medidor_tamano,
 )
 from proyecto_aemet_api.services.forecast_service import CacheEstaciones, PredictorMeteo
-
 
 @asynccontextmanager
 # Un lifespan define que pasa al ARRANCAR y al APAGAR el servidor. Todo lo de antes del yield se ejecuta al arrancar, lo de despues, al parar.

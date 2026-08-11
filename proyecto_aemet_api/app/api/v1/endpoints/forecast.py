@@ -1,14 +1,12 @@
 """Endpoint de predicción de temperatura."""
+
 from __future__ import annotations
-
 from fastapi import APIRouter, Depends, HTTPException
-
 from proyecto_aemet_api.app.dependencies import get_predictor
 from proyecto_aemet_api.schemas.forecast import PrediccionRequest, PrediccionTemperaturaOut
 from proyecto_aemet_api.services.forecast_service import PredictorMeteo
 
 router = APIRouter()
-
 
 @router.post("/prediccion", response_model=list[PrediccionTemperaturaOut])
 async def prediccion(

@@ -23,9 +23,8 @@ DIAS_HISTORICO = 20
 # Periodo anual usado en la codificacion ciclica (365.25 tiene en cuenta los bisiestos).
 _DIAS_ANIO = 365.25
 
-
 def _sin_cos_dia(fecha_objetivo: date) -> tuple[float, float]:
-    # Convierte la fecha en dos numeros (seno y coseno) para que el modelo entienda que el 31 de diciembre y el 1 de enero estan "pegados" en el ciclo anual.
+    # Convierte la fecha en dos numeros (seno y coseno) para que el modelo entienda que el 31 de diciembre y el 1 de enero estan pegados en el ciclo anual.
     dia_del_anio = fecha_objetivo.timetuple().tm_yday
     angulo = 2.0 * np.pi * dia_del_anio / _DIAS_ANIO
     return float(np.sin(angulo)), float(np.cos(angulo))

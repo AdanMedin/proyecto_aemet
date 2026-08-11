@@ -1,8 +1,7 @@
 """Repositorio de acceso a datos de mediciones diarias."""
+
 from __future__ import annotations
-
 import asyncpg
-
 
 class ObservationRepository:
     # Unica capa que habla con la base de datos para las mediciones diarias.

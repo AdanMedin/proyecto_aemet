@@ -1,8 +1,7 @@
 """Repositorio de acceso a datos de estaciones."""
+
 from __future__ import annotations
-
 import asyncpg
-
 
 class StationRepository:
     # Es la capa que habla con la base de datos. El resto del codigo le pide datos a esta clase y no escribe SQL por su cuenta, asi todo el SQL queda en un solo sitio.

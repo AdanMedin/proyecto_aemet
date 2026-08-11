@@ -1,4 +1,5 @@
 """Configuración central de la aplicación."""
+
 from functools import lru_cache
 from pathlib import Path
 
@@ -8,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _ENV_FILE = Path(__file__).parents[2] / ".env"
 
 class Settings(BaseSettings):
-    # BaseSettings lee automaticamente estos valores de variables de entorno o de un archivo `.env`, asi no dejamos contrasenas escritas en el codigo.
+    # BaseSettings lee automaticamente estos valores de variables de entorno o de un archivo .env, asi no dejamos contrasenas escritas en el codigo.
     model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     # DSN = "Data Source Name": la cadena de conexion a PostgreSQL.
@@ -27,8 +28,7 @@ class Settings(BaseSettings):
     # Segundos que la cache de estaciones es valida antes de recargar (TTL).
     estaciones_ttl_segundos: float = 3600.0
 
-
 @lru_cache
 def get_settings() -> Settings:
-    # lru_cache -> crea el objeto Settings una sola vez y reutiliza esa misma instancia en todas las llamadas (no vuelve a leer el .env cada vez).
+    # lru_cache crea el objeto Settings una sola vez y reutiliza esa misma instancia en todas las llamadas (no vuelve a leer el .env cada vez).
     return Settings()

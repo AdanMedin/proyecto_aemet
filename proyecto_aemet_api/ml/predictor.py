@@ -1,14 +1,12 @@
 """Predicción con el modelo entrenado: registro y caché de modelos por estación."""
-from __future__ import annotations
 
+from __future__ import annotations
 import asyncio
 import os
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
-
 import joblib
-
 
 @dataclass
 class ModeloEstacion:
@@ -19,10 +17,8 @@ class ModeloEstacion:
     modelo: Any # el modelo entrenado (objeto de sklearn, etc.)
     metadata: dict[str, Any] = field(default_factory=dict) # metadata = datos extra opcionales (fecha de entrenamiento, metricas...).
 
-
 # Firma (la forma) que debe tener la funcion real de carga: recibe el indicativo (texto) y devuelve el modelo ya listo, o None si no existe.
 CargadorModelo = Callable[[str], Any]
-
 
 class RegistroModelosLazy:
     """

@@ -1,8 +1,7 @@
 """Dependencias inyectables de FastAPI."""
+
 from __future__ import annotations
-
 from fastapi import Request
-
 from proyecto_aemet_api.services.forecast_service import PredictorMeteo
 
     # FastAPI llamara a esta funcion y pasara su resultado al endpoint que la pida.

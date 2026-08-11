@@ -1,21 +1,18 @@
 """Servicio de predicción de temperatura: estaciones cercanas + sus modelos."""
-from __future__ import annotations
 
+from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Optional
-
 import numpy as np
-
 from proyecto_aemet_api.database.repositories.observation_repository import (
     ObservationRepository,
 )
 from proyecto_aemet_api.database.repositories.station_repository import StationRepository
 from proyecto_aemet_api.ml.dataset import DIAS_HISTORICO, construir_features
 from proyecto_aemet_api.ml.predictor import ModeloEstacion, RegistroModelosLazy
-
 
 # =====================================================================
 # 1) RESULTADO DE LA BUSQUEDA DE ESTACIONES
@@ -30,7 +27,6 @@ class EstacionCercana:
     latitud: float
     longitud: float
     distancia_km: float
-
 
 # =====================================================================
 # 2) CALCULO DE DISTANCIA (Haversine, vectorizado con numpy)
@@ -58,7 +54,6 @@ def _haversine_vectorizado(pred_lat: float, pred_lon: float, sta_lats: np.ndarra
 
     return _RADIO_TIERRA_KM * c   # angulo por radio de la Tierra = km reales
 
-
 # =====================================================================
 # 3) CACHE DE ESTACIONES (coordenadas en memoria, refrescadas por TTL).
 # =====================================================================
@@ -73,7 +68,6 @@ class _EstacionesData:
     provincias: np.ndarray
     lats: np.ndarray
     lons: np.ndarray
-
 
 class CacheEstaciones:
     """
@@ -149,7 +143,6 @@ class CacheEstaciones:
             for i in orden
         ]
 
-
 # =====================================================================
 # 4) SERVICIO: une cache de estaciones + registro de modelos
 # =====================================================================
@@ -160,14 +153,12 @@ class EstacionConModelo:
     estacion: EstacionCercana
     modelo: Optional[ModeloEstacion]
 
-
 @dataclass(frozen=True)
 class PrediccionTemperatura:
     # Resultado final: una estacion con la temperatura media prevista para fecha (el dia siguiente a su ultima medicion registrada).
     estacion: EstacionCercana
     fecha: date
     temperatura: float
-
 
 class PredictorMeteo:
     # Clase "de alto nivel": la que se usa desde fuera (los endpoints de la web). 
