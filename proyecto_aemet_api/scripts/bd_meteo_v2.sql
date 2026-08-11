@@ -58,7 +58,7 @@ CREATE TABLE meteo.mediciones_diarias (
     CONSTRAINT fk_mediciones_estacion
         FOREIGN KEY (indicativo) REFERENCES meteo.estaciones (indicativo)
         ON UPDATE CASCADE
-        ON DELETE RESTRICT,
+        ON DELETE RESTRICT
 
 )
 PARTITION BY RANGE (fecha);

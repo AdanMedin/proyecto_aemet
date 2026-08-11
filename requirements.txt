@@ -5,11 +5,10 @@ pydantic
 pydantic-settings
 
 # --- Base de datos ---
-sqlalchemy
-psycopg[binary]
 asyncpg
+psycopg[binary]
 
-# --- Datos / ML ---
+# --- Datos/ML ---
 pandas
 numpy
 scikit-learn
@@ -18,12 +17,15 @@ openpyxl
 
 # --- Ingesta AEMET ---
 requests
-feedparser
 python-dotenv
+
+# --- Análisis (notebooks) ---
+matplotlib
+seaborn
+scipy
 
 # --- Frontend ---
 streamlit
-matplotlib
 
 # --- Notebooks ---
 ipykernel

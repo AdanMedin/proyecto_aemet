@@ -57,9 +57,8 @@ class RegistroModelosLazy:
                 self._cache.move_to_end(indicativo)
                 return self._cache[indicativo][0]
 
-        # PASO 2: cargarlo puede ser lento (disco), asi que se hace FUERA del
-        # cerrojo. to_thread ejecuta una funcion normal (sincrona) en un hilo
-        # aparte para no congelar el programa asincrono.
+        # PASO 2: cargarlo puede ser lento (disco), asi que se hace FUERA del cerrojo. 
+        # to_thread ejecuta una funcion normal (sincrona) en un hilo aparte para no congelar el programa asincrono.
         modelo_obj = await asyncio.to_thread(self._cargador, indicativo)
         if modelo_obj is None:
             return None
@@ -82,8 +81,7 @@ class RegistroModelosLazy:
             self._cache.move_to_end(indicativo)
             self._memoria_actual_mb += tamano_mb
 
-            # Si nos pasamos del presupuesto, tiramos los menos usados
-            # (popitem(last=False) saca el mas antiguo), dejando al menos 1.
+            # Si nos pasamos del presupuesto, tiramos los menos usados (popitem(last=False) saca el mas antiguo), dejando al menos 1.
             while self._memoria_actual_mb > self._max_memoria_mb and len(self._cache) > 1:
                 _, (_, tamano_desalojado) = self._cache.popitem(last=False)
                 self._memoria_actual_mb -= tamano_desalojado
@@ -91,8 +89,8 @@ class RegistroModelosLazy:
         return modelo
 
     async def precargar(self, estaciones: list[Any]) -> None:
-        """Opcional: 'calienta' la caché al arrancar con unas estaciones dadas."""
-        # gather(*...) lanza muchas cargas EN PARALELO y espera a que acaben todas.
+        """Opcional: calienta la caché al arrancar con unas estaciones dadas."""
+        # gather() lanza muchas cargas EN PARALELO y espera a que acaben todas.
         await asyncio.gather(
             *(self.obtener(e.indicativo, e.latitud, e.longitud) for e in estaciones)
         )
@@ -115,9 +113,9 @@ def crear_cargador_desde_disco(ruta_modelos: str) -> CargadorModelo:
     def cargar(indicativo: str) -> Any:
         ruta = os.path.join(ruta_modelos, f"{indicativo}.joblib")
         try:
-            return joblib.load(ruta)   # deserializa el modelo guardado en el archivo
+            return joblib.load(ruta) # deserializa el modelo guardado en el archivo
         except FileNotFoundError:
-            return None                # esa estacion todavia no tiene modelo
+            return None # esa estacion todavia no tiene modelo
     return cargar
 
 
@@ -125,7 +123,7 @@ def crear_medidor_tamano(ruta_modelos: str, tamano_defecto_mb: float) -> Callabl
     def tamano(indicativo: str) -> float:
         ruta = os.path.join(ruta_modelos, f"{indicativo}.joblib")
         try:
-            return os.path.getsize(ruta) / (1024 * 1024)  # bytes -> MB
+            return os.path.getsize(ruta) / (1024 * 1024)
         except FileNotFoundError:
             return tamano_defecto_mb
     return tamano

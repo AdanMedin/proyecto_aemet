@@ -5,9 +5,8 @@ import asyncpg
 
 
 async def crear_pool(dsn: str) -> asyncpg.Pool:
-    # Un "pool" es un grupo de conexiones ya abiertas a PostgreSQL que se
-    # reutilizan, en vez de abrir y cerrar una conexion en cada peticion
-    # (abrir conexiones es lento). min_size/max_size = cuantas mantener.
+    # Un pool es un grupo de conexiones ya abiertas a PostgreSQL que se reutilizan, en vez de abrir y cerrar una conexion en cada peticion (abrir conexiones es lento). 
+    # min_size/max_size = cuantas mantener.
     return await asyncpg.create_pool(dsn, min_size=2, max_size=10)
 
 

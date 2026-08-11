@@ -11,7 +11,7 @@ services:
       - "5432:5432"
     volumes:
       - aemet_pgdata:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./docker/postgres/bd_meteo_v2.sql:/docker-entrypoint-initdb.d/bd_meteo_v2.sql:ro
     healthcheck:
       # La API esperara a que este "healthy" antes de arrancar.
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aemet} -d ${POSTGRES_DB:-aemet}"]

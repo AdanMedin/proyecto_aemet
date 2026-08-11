@@ -99,14 +99,13 @@ class CacheEstaciones:
             lats=np.array([float(r["latitud"]) for r in rows], dtype=np.float64),
             lons=np.array([float(r["longitud"]) for r in rows], dtype=np.float64),
         )
-        self._cargado_en = time.monotonic()   # reloj que solo avanza (para medir TTL)
+        self._cargado_en = time.monotonic() # reloj que solo avanza (para medir TTL)
 
     async def _asegurar_cargado(self) -> None:
         vencido = (time.monotonic() - self._cargado_en) > self._ttl
         if self._data is None or vencido:
             async with self._lock:
-                # doble comprobacion: quiza otra peticion ya recargo mientras
-                # esperabamos el cerrojo, para no recargar por gusto.
+                # doble comprobacion: quiza otra peticion ya recargo mientras esperabamos el cerrojo, para no recargar por gusto.
                 vencido = (time.monotonic() - self._cargado_en) > self._ttl
                 if self._data is None or vencido:
                     await self._cargar()
@@ -125,7 +124,7 @@ class CacheEstaciones:
     ) -> list[EstacionCercana]:
         await self._asegurar_cargado()
         d = self._data
-        assert d is not None   # comprobacion de seguridad; aqui nunca sera None
+        assert d is not None # comprobacion de seguridad; aqui nunca sera None
 
         # distancia del punto a TODAS las estaciones de golpe (vectorizado).
         distancias = _haversine_vectorizado(latitud, longitud, d.lats, d.lons)
@@ -190,7 +189,7 @@ class PredictorMeteo:
         longitud: float,
         k: int = 5, # cuantas estaciones devolver como maximo
         max_distancia_km: float = 50.0, # radio: para ignorar las mas lejanas
-        solo_con_modelo: bool = True,   # si True, descarta estaciones sin modelo
+        solo_con_modelo: bool = True, # si True, descarta estaciones sin modelo
     ) -> list[EstacionConModelo]:
         
         # 1) estaciones mas cercanas al punto.
@@ -239,7 +238,7 @@ class PredictorMeteo:
     async def _predecir_estacion(
         self, con_modelo: EstacionConModelo
     ) -> Optional[PrediccionTemperatura]:
-        assert con_modelo.modelo is not None   # ya venia filtrado por solo_con_modelo
+        assert con_modelo.modelo is not None # ya venia filtrado por solo_con_modelo
 
         # 1) ultimas mediciones registradas de esta estacion (orden cronologico).
         mediciones = await self._observaciones.obtener_ultimas_mediciones(
@@ -257,7 +256,7 @@ class PredictorMeteo:
 
         # 4) construir el vector de entrada y pedir la prediccion al modelo.
         features = construir_features(tmed, hrmedia, fecha_objetivo)
-        # predict es sincrono (sklearn); lo lanzamos en un hilo para no bloquear.
+        # predict es sincrono (sklearn) lo lanzamos en un hilo para no bloquear.
         prediccion = await asyncio.to_thread(con_modelo.modelo.modelo.predict, features)
 
         return PrediccionTemperatura(
