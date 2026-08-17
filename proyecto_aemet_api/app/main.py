@@ -10,12 +10,15 @@ from proyecto_aemet_api.database.repositories.observation_repository import (
 )
 from proyecto_aemet_api.database.repositories.station_repository import StationRepository
 from proyecto_aemet_api.database.session import cerrar_pool, crear_pool
+from proyecto_aemet_api.ingestion.loader import DataLoader
 from proyecto_aemet_api.ml.predictor import (
     RegistroModelosLazy,
     crear_cargador_desde_disco,
     crear_medidor_tamano,
 )
 from proyecto_aemet_api.services.forecast_service import CacheEstaciones, PredictorMeteo
+from proyecto_aemet_api.services.ingestion_service import IngestionService
+from proyecto_aemet_api.services.training_service import TrainingService
 
 @asynccontextmanager
 # Un lifespan define que pasa al ARRANCAR y al APAGAR el servidor. Todo lo de antes del yield se ejecuta al arrancar, lo de despues, al parar.
@@ -46,10 +49,21 @@ async def lifespan(app: FastAPI):
     # 4) Servicio que junta cache de estaciones, modelos y mediciones de la BD.
     predictor = PredictorMeteo(cache_estaciones, registro_modelos, repositorio_mediciones)
 
+    # 5) Servicios de operaciones: ingesta (AEMET -> BD) y reentrenamiento (BD -> modelos).
+    ingestion = IngestionService(DataLoader(pool))
+    training = TrainingService(
+        pool,
+        ruta_salida=settings.ruta_modelos,
+        s3_bucket=settings.s3_bucket_modelos,
+        aws_region=settings.aws_region,
+    )
+
     # Guardamos en app.state lo que necesitaremos durante las peticiones. 
     # Esto guarda el pool de conexiones y el predictor(cache con estaciones cercanas + modelos) en el estado global de la aplicación, para poder acceder a ellos desde cualquier endpoint sin tener que recrearlos en cada petición.
     app.state.pool = pool
     app.state.predictor = predictor
+    app.state.ingestion = ingestion
+    app.state.training = training
 
     yield  # aqui la app esta viva atendiendo peticiones, despues de esto se ejecuta el codigo de apagado.
 

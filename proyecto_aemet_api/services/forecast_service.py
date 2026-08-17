@@ -99,7 +99,7 @@ class CacheEstaciones:
         vencido = (time.monotonic() - self._cargado_en) > self._ttl
         if self._data is None or vencido:
             async with self._lock:
-                # doble comprobacion: quiza otra peticion ya recargo mientras esperabamos el cerrojo, para no recargar por gusto.
+                # doble comprobacion: quiza otra peticion ya recargo mientras esperabamos el lock. Para no recargar si no es necesario.
                 vencido = (time.monotonic() - self._cargado_en) > self._ttl
                 if self._data is None or vencido:
                     await self._cargar()

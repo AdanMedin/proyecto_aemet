@@ -1,0 +1,5 @@
+# El scheduler no ejecuta codigo: solo llama a los endpoints de la API.
+# Ingesta cada 5 dias a las 03:00 -> POST /api/v1/admin/ingestar
+0 3 */5 * * curl -sf -X POST "http://api:8000/api/v1/admin/ingestar?dias=5" >> /var/log/ingesta.log 2>&1
+# Reentrenamiento cada 15 dias a las 04:00 -> POST /api/v1/admin/reentrenar
+0 4 */15 * * curl -sf -X POST "http://api:8000/api/v1/admin/reentrenar" >> /var/log/entrenamiento.log 2>&1

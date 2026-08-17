@@ -19,6 +19,9 @@ openpyxl
 requests
 python-dotenv
 
+# --- AWS S3 (modelos) ---
+boto3
+
 # --- Análisis (notebooks) ---
 matplotlib
 seaborn

@@ -65,6 +65,33 @@ class DataTransformer:
 
         return df
 
+    def transform_estaciones(self, df: pd.DataFrame) -> pd.DataFrame:
+        # Limpia el inventario de estaciones: la API devuelve altitud como texto y lat/lon en formato "402830N" (grados, minutos, segundos, hemisferio).
+        df = df.copy()
+
+        if "altitud" in df.columns:
+            df["altitud"] = pd.to_numeric(df["altitud"], errors="coerce")
+        if "latitud" in df.columns:
+            df["latitud"] = df["latitud"].apply(self._dms_a_decimal)
+        if "longitud" in df.columns:
+            df["longitud"] = df["longitud"].apply(self._dms_a_decimal)
+        return df
+
+    @staticmethod
+    def _dms_a_decimal(valor):
+        # "402830N" -> 40.475
+        if pd.isna(valor):
+            return np.nan
+        valor = str(valor).strip()
+        m = re.fullmatch(r"(\d+)(\d{2})(\d{2})([NSEW])", valor, re.IGNORECASE)
+        if not m:
+            return pd.to_numeric(valor, errors="coerce")
+        grados, minutos, segundos, hemisferio = m.groups()
+        decimal = int(grados) + int(minutos) / 60 + int(segundos) / 3600
+        if hemisferio.upper() in ("S", "W"):
+            decimal = -decimal
+        return round(decimal, 6)
+
     @staticmethod
     def _normalizar_hora(valor):
         if pd.isna(valor):

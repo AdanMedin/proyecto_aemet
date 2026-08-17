@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _ENV_FILE = Path(__file__).parents[2] / ".env"
 
 class Settings(BaseSettings):
-    # BaseSettings lee automaticamente estos valores de variables de entorno o de un archivo .env, asi no dejamos contrasenas escritas en el codigo.
+    # BaseSettings lee automaticamente estos valores de variables de entorno o de un archivo .env, asi no dejamos contrasenhas escritas en el codigo.
     model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     # DSN = "Data Source Name": la cadena de conexion a PostgreSQL.
@@ -27,6 +27,11 @@ class Settings(BaseSettings):
 
     # Segundos que la cache de estaciones es valida antes de recargar (TTL).
     estaciones_ttl_segundos: float = 3600.0
+
+    # --- AWS S3 (subida de modelos) ---
+    # Bucket donde el reentrenamiento sube los .joblib. Vacio = desactivado (los modelos se quedan solo en disco local).
+    s3_bucket_modelos: str = ""
+    aws_region: str = "eu-west-1"
 
 @lru_cache
 def get_settings() -> Settings:
