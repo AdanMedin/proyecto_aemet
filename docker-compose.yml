@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: aemet_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aemet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aemet}
+      POSTGRES_DB: ${POSTGRES_DB:-aemet}
+    ports:
+      - "5432:5432"
+    volumes:
+      - aemet_pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/bd_meteo_v2.sql:/docker-entrypoint-initdb.d/bd_meteo_v2.sql:ro
+    healthcheck:
+      # La API esperara a que este "healthy" antes de arrancar.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aemet} -d ${POSTGRES_DB:-aemet}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    container_name: aemet_api
+    restart: unless-stopped
+    environment:
+      # Dentro de Docker el host de la BD es "postgres" (el nombre del servicio), no "localhost". Esquema postgresql:// porque la app usa asyncpg.
+      DATABASE_DSN: postgresql://${POSTGRES_USER:-aemet}:${POSTGRES_PASSWORD:-aemet}@postgres:5432/${POSTGRES_DB:-aemet}
+      RUTA_MODELOS: proyecto_aemet_api/ml/artifacts
+      # La API ejecuta la ingesta y el reentrenamiento; necesita estas credenciales.
+      AEMET_API_KEY: ${AEMET_API_KEY:-}
+      AEMET_BASE_URL: ${AEMET_BASE_URL:-https://opendata.aemet.es/opendata/api}
+      S3_BUCKET_MODELOS: ${S3_BUCKET_MODELOS:-}
+      AWS_REGION: ${AWS_REGION:-eu-west-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      # Modelos entrenados desde el host, sin reconstruir la imagen.
+      - ./proyecto_aemet_api/ml/artifacts:/app/proyecto_aemet_api/ml/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: aemet_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+
+  scheduler:
+    # Solo hace llamadas HTTP a la API en horario programado. No tiene codigo.
+    build:
+      context: .
+      dockerfile: docker/scheduler/Dockerfile
+    container_name: aemet_scheduler
+    restart: unless-stopped
+    depends_on:
+      - api
+
+volumes:
+  aemet_pgdata:

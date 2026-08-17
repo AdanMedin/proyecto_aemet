@@ -1,0 +1,38 @@
+# --- API ---
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+
+# --- Base de datos ---
+asyncpg
+psycopg[binary]
+
+# --- Datos/ML ---
+pandas
+numpy
+scikit-learn
+joblib
+openpyxl
+
+# --- Ingesta AEMET ---
+requests
+python-dotenv
+
+# --- AWS S3 (modelos) ---
+boto3
+
+# --- Análisis (notebooks) ---
+matplotlib
+seaborn
+scipy
+
+# --- Frontend ---
+streamlit
+
+# --- Notebooks ---
+ipykernel
+
+# --- Tests ---
+pytest
+httpx
