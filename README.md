@@ -51,7 +51,7 @@ proyecto_aemet_api/
 
 El proyecto sigue el principio de separación de responsabilidades: cada módulo tiene una función bien delimitada. Si en el futuro cambia la forma de conectarse a la base de datos, solo hay que modificar la carpeta `database/`. Si cambia el modelo de predicción, solo se toca `ml/`. El resto del sistema permanece inalterado.
 
-La lógica de negocio reside íntegramente en `services/`, y el planificador de tareas (scheduler) se limita a invocar la API mediante llamadas HTTP, sin conocer los detalles de implementación internos. Crontab es el archivo de configuración del scheduler le dice al sistema qué comandos ejecutar y cuándo, de forma automática y repetida.
+La lógica de negocio reside íntegramente en `services/`, y el planificador de tareas (scheduler) se limita a invocar la API mediante llamadas HTTP, sin conocer los detalles de implementación internos. `crontab` es el archivo de configuración del scheduler le dice al sistema qué comandos ejecutar y cuándo, de forma automática y repetida. `entrypoint.sh` arranca crond, proceso en segundo plano que lee el archivo `crontab` y ejecuta las tareas programadas en él.
 
 ## La base de datos
 

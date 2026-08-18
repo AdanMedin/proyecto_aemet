@@ -1,5 +1,18 @@
-# El scheduler no ejecuta codigo: solo llama a los endpoints de la API.
-# Ingesta cada 5 dias a las 03:00 -> POST /api/v1/admin/ingestar
+# Archivo crontab: define tareas automáticas que se ejecutan en horarios específicos.
+# El scheduler no ejecuta código propio; solo hace llamadas HTTP a la API.
+# Formato: minuto hora día_del_mes mes día_de_la_semana comando
+
+# TAREA 1: Descargar datos nuevos de AEMET (ingesta)
+# Ejecuta: cada 5 días a las 3:00 AM
+# Qué hace: llama a la API con método POST en /api/v1/admin/ingestar
+# Parámetro dias=5: descarga datos de los últimos 5 días
+# Logs: guarda todo en /var/log/ingesta.log
+
 0 3 */5 * * curl -sf -X POST "http://api:8000/api/v1/admin/ingestar?dias=5" >> /var/log/ingesta.log 2>&1
-# Reentrenamiento cada 15 dias a las 04:00 -> POST /api/v1/admin/reentrenar
+
+# TAREA 2: Reentrenar el modelo de predicción
+# Ejecuta: cada 15 días a las 4:00 AM (una hora después de la ingesta, para que tenga datos nuevos)
+# Qué hace: llama a la API con método POST en /api/v1/admin/reentrenar
+# Logs: guarda todo en /var/log/entrenamiento.log
+
 0 4 */15 * * curl -sf -X POST "http://api:8000/api/v1/admin/reentrenar" >> /var/log/entrenamiento.log 2>&1
