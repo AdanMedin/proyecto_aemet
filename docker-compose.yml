@@ -1,71 +1,97 @@
+# Este archivo define todos los servicios (contenedores) que la app necesita para funcionar.
+# Docker va a crear y conectar automáticamente: base de datos, API, interfaz para la BD y el planificador de tareas.
+
 services:
+  # SERVICIO 1: BASE DE DATOS (PostgreSQL)
+  # Aquí se guardan todos los datos de estaciones y predicciones meteorológicas.
   postgres:
-    image: postgres:16
-    container_name: aemet_postgres
-    restart: unless-stopped
+    image: postgres:16  # Uso la versión 16 de PostgreSQL (base de datos oficial)
+    container_name: aemet_postgres  # Nombre del contenedor para identificarlo fácil
+    restart: unless-stopped  # Si se cae, Docker lo reinicia automáticamente
     environment:
+      # Credenciales de acceso (contraseña y nombre de BD). Si no están en .env, usa valores por defecto.
       POSTGRES_USER: ${POSTGRES_USER:-aemet}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aemet}
       POSTGRES_DB: ${POSTGRES_DB:-aemet}
     ports:
+      # Puerto 5432 es el estándar de PostgreSQL. Así puedo conectar desde mi máquina.
       - "5432:5432"
     volumes:
+      # aemet_pgdata: donde PostgreSQL guarda los datos de verdad (para que no se pierdan si el contenedor se borra).
       - aemet_pgdata:/var/lib/postgresql/data
+      # Este archivo SQL lo ejecuta automáticamente al crear la BD por primera vez (crea las tablas).
       - ./docker/postgres/bd_meteo_v2.sql:/docker-entrypoint-initdb.d/bd_meteo_v2.sql:ro
     healthcheck:
-      # La API esperara a que este "healthy" antes de arrancar.
+      # Comprobación de salud: cada 5 segundos pregunta "¿estás vivo?". Esto le dice a la API cuándo puede empezar.
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aemet} -d ${POSTGRES_DB:-aemet}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      interval: 5s  # Cada 5 segundos
+      timeout: 5s   # Espera máximo 5 segundos por respuesta
+      retries: 5    # Si falla 5 veces seguidas, considera que la BD no está lista
 
+  # SERVICIO 2: MI API
+  # Es el corazón del proyecto: recibe predicciones, gestiona datos, ejecuta entrenamientos.
   api:
     build:
-      context: .
+      context: .  # Construye desde el Dockerfile que está en docker/api/Dockerfile
       dockerfile: docker/api/Dockerfile
     container_name: aemet_api
-    restart: unless-stopped
+    restart: unless-stopped  # Si se cae, reinicia solo
     environment:
-      # Dentro de Docker el host de la BD es "postgres" (el nombre del servicio), no "localhost". Esquema postgresql:// porque la app usa asyncpg.
+      # Conexión a la base de datos: "postgres" es el nombre del servicio de arriba (Docker lo resuelve automáticamente).
+      # Esquema postgresql:// es porque la app usa asyncpg (driver de Python para PostgreSQL).
       DATABASE_DSN: postgresql://${POSTGRES_USER:-aemet}:${POSTGRES_PASSWORD:-aemet}@postgres:5432/${POSTGRES_DB:-aemet}
-      RUTA_MODELOS: proyecto_aemet_api/ml/artifacts
-      # La API ejecuta la ingesta y el reentrenamiento; necesita estas credenciales.
+      RUTA_MODELOS: proyecto_aemet_api/ml/artifacts  # Dónde guardo los modelos ML entrenados
+      # Credenciales de la API de AEMET (la que proporciona datos meteorológicos reales).
       AEMET_API_KEY: ${AEMET_API_KEY:-}
       AEMET_BASE_URL: ${AEMET_BASE_URL:-https://opendata.aemet.es/opendata/api}
+      # Almacenamiento en Amazon S3 (la nube) para los modelos entrenados.
       S3_BUCKET_MODELOS: ${S3_BUCKET_MODELOS:-}
       AWS_REGION: ${AWS_REGION:-eu-west-1}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
     ports:
+      # Mi API escucha en puerto 8000. Así accedo desde http://localhost:8000
       - "8000:8000"
     volumes:
-      # Modelos entrenados desde el host, sin reconstruir la imagen.
+      # Los modelos ML entrenados están en mi ordenador (./proyecto_aemet_api/ml/artifacts).
+      # Los enlaza aquí para que la API pueda usarlos sin necesidad de reconstruir la imagen cada vez.
       - ./proyecto_aemet_api/ml/artifacts:/app/proyecto_aemet_api/ml/artifacts
     depends_on:
+      # La API espera a que PostgreSQL esté listo (service_healthy) antes de empezar.
       postgres:
         condition: service_healthy
 
+  # SERVICIO 3: PGADMIN (Interfaz visual para la BD)
+  # Es una web para ver y gestionar la base de datos sin comandos (útil para debugging).
   pgadmin:
-    image: dpage/pgadmin4
+    image: dpage/pgadmin4  # Aplicación oficial para administrar PostgreSQL desde navegador
     container_name: aemet_pgadmin
     restart: unless-stopped
     environment:
+      # Credenciales para acceder a la interfaz web de pgAdmin.
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
     ports:
+      # Accedo a pgAdmin en http://localhost:5050 desde mi navegador.
       - "5050:80"
     depends_on:
-      - postgres
+      - postgres  # Necesita que PostgreSQL esté corriendo
 
+  # SERVICIO 4: SCHEDULER (Tareas programadas)
+  # Un servicio que automáticamente llama a mi API en horarios específicos:
+  # - Cada 5 días: descarga datos nuevos de AEMET
+  # - Cada 15 días: reentrenamiento del modelo de predicción
   scheduler:
-    # Solo hace llamadas HTTP a la API en horario programado. No tiene codigo.
     build:
       context: .
       dockerfile: docker/scheduler/Dockerfile
     container_name: aemet_scheduler
     restart: unless-stopped
     depends_on:
-      - api
+      - api  # Necesita que la API esté corriendo para poder llamarla
 
+# VOLÚMENES (Almacenamiento persistente)
+# Sin estos, los datos se perderían si borro los contenedores.
 volumes:
+  # Este volumen guarda los datos de PostgreSQL de forma permanente en mi máquina.
   aemet_pgdata:

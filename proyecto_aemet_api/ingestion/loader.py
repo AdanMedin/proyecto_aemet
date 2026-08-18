@@ -4,10 +4,9 @@ from __future__ import annotations
 import asyncpg
 import pandas as pd
 
-# La AEMET y nuestra base de datos llaman a las mismas cosas con nombres
-# distintos. Por ejemplo, la AEMET dice "hrMedia" y nuestra base de datos dice
-# "hrmedia". Este diccionario es el "traductor": a la izquierda el nombre que da
-# la AEMET, a la derecha el nombre que usa nuestra base de datos.
+# La AEMET y nuestra base de datos llaman a las mismas cosas con nombres distintos. 
+# Por ejemplo, la AEMET dice "hrMedia" y nuestra base de datos dice "hrmedia". 
+# Este diccionario es el "traductor": a la izquierda el nombre que da la AEMET, a la derecha el nombre que usa nuestra base de datos.
 # (La tabla que manda es meteo.mediciones_diarias, definida en bd_meteo_v2.sql).
 _MEDICIONES_COLUMNAS = {
     "fecha": "fecha",
@@ -59,9 +58,8 @@ def _registros(df: pd.DataFrame, mapeo: dict[str, str]) -> list[dict]:
 class DataLoader:
     # Su unico trabajo es meter los datos ya limpios en la base de datos.
     # Es "idempotente": significa que se puede ejecutar varias veces sin miedo.
-    # Si un dato ya existia, lo actualiza en vez de duplicarlo o dar error. Esto
-    # es importante porque la ingesta se repite cada 5 dias y a veces la AEMET
-    # corrige datos de dias anteriores.
+    # Si un dato ya existia, lo actualiza en vez de duplicarlo o dar error. 
+    # Esto es importante porque la ingesta se repite cada 5 dias y a veces la AEMET corrige datos de dias anteriores.
 
     def __init__(self, pool: asyncpg.Pool) -> None:
         # pool = grupo de conexiones a la base de datos ya abiertas y reutilizables.
@@ -97,8 +95,8 @@ class DataLoader:
             return 0
 
         columnas = list(_MEDICIONES_COLUMNAS.values())
-        # La pareja (indicativo, fecha) identifica cada fila de forma unica. Si ya
-        # existe, actualizamos el resto de columnas con los valores nuevos.
+        # La pareja (indicativo, fecha) identifica cada fila de forma unica. 
+        # Si ya existe, actualizamos el resto de columnas con los valores nuevos.
         columnas_update = [c for c in columnas if c not in ("fecha", "indicativo")]
         asignaciones = ", ".join(f"{c} = EXCLUDED.{c}" for c in columnas_update)
 
@@ -115,7 +113,6 @@ class DataLoader:
 
 
 def _placeholders(columnas: list[str]) -> str:
-    # Por seguridad, los valores NO se meten directamente en el texto del SQL
-    # (eso abriria la puerta a ataques). En su lugar se ponen "huecos" ($1, $2...)
-    # y la libreria rellena esos huecos con los valores de forma segura.
+    # Por seguridad, los valores NO se meten directamente en el texto del SQL. 
+    # En su lugar se ponen "huecos" ($1, $2...) y la libreria rellena esos huecos con los valores de forma segura.
     return ", ".join(f"${i}" for i in range(1, len(columnas) + 1))

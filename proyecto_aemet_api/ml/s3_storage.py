@@ -7,10 +7,9 @@ import boto3
 
 
 class S3Storage:
-    # Maneja los modelos (archivos .joblib) en Amazon S3. S3 es un servicio de
-    # Amazon Web Services (AWS) para guardar archivos en la nube, como una
-    # carpeta gigante en internet. Un "bucket" es el nombre que le ponemos a
-    # nuestra carpeta dentro de S3.
+    # Maneja los modelos (archivos .joblib) en Amazon S3. 
+    # S3 es un servicio de AWS para guardar archivos en la nube.
+    # Un "bucket" es el nombre que le ponemos a nuestra carpeta dentro de S3.
     
     # Las claves de acceso de Amazon NO estan escritas aqui (seria inseguro).
     # La libreria boto3 las lee sola de la configuracion (el archivo .env).
@@ -24,13 +23,11 @@ class S3Storage:
         self._s3 = boto3.client("s3", region_name=region)
 
     def _key(self, indicativo: str) -> str:
-        # La "key" es la ruta completa del archivo dentro de S3, por ejemplo
-        # "modelos/3195.joblib". Cada estacion tiene su propio archivo.
+        # La "key" es la ruta completa del archivo dentro de S3, por ejemplo "modelos/3195.joblib". Cada estacion tiene su propio archivo.
         return f"{self._prefix}/{indicativo}.joblib"
 
     def subir_modelo(self, ruta_local: str, indicativo: str) -> str:
-        # Sube un modelo del disco a la nube. Devuelve su direccion s3:// para
-        # saber donde quedo guardado.
+        # Sube un modelo del disco a la nube. Devuelve su direccion s3 para saber donde quedo guardado.
         key = self._key(indicativo)
         self._s3.upload_file(ruta_local, self._bucket, key)
         return f"s3://{self._bucket}/{key}"
