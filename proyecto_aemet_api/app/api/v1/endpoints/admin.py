@@ -12,7 +12,7 @@ router = APIRouter()
 @router.post("/admin/ingestar")
 async def ingestar(request: Request, dias: int = 5, estaciones: bool = False):
     # Lanza la descarga de datos de la AEMET. 
-    # El scheduler (el despertador) llama a esta ruta cada 5 dias de forma automatica, pero tambien se puede llamar a mano para probar. `dias=5` significa "trae los ultimos 5 dias".
+    # El scheduler llama a esta ruta cada 5 dias de forma automatica, pero tambien se puede llamar a mano para probar. dias=5 significa "trae los ultimos 5 dias".
     
     # request.app.state.ingestion recupera el servicio de ingesta que se creo una sola vez al arrancar la API (no se crea de nuevo en cada llamada).
     servicio = request.app.state.ingestion

@@ -43,19 +43,17 @@ class ResultadoEntrenamiento:
 
 
 def _ventanas(df: pd.DataFrame, window: int) -> tuple[np.ndarray, np.ndarray]:
-    # El modelo aprende mirando "ventanas" de dias. Por ejemplo, con una ventana
-    # de 20 dias: le ensenyamos los 20 dias anteriores y le pedimos que adivine
-    # la temperatura del dia siguiente. Repetimos esto miles de veces deslizando
-    # la ventana por todo el historico, y asi el modelo aprende el patron.
+    # El modelo aprende mirando "ventanas" de dias (window). 
+    # Por ejemplo, con una ventana de 20 dias: le ensenhamos los 20 dias anteriores y le pedimos que adivine la temperatura del dia siguiente.
+    # Repetimos esto miles de veces moviendo la ventana por todo el historico, y asi el modelo aprende el patron.
     
     # Devuelve dos cosas:
     #   X = las entradas (lo que el modelo ve para pensar)
     #   y = la respuesta correcta (lo que deberia predecir)
     temp = df.sort_values("fecha")[COLUMNAS_ENTRENAMIENTO].reset_index(drop=True)
 
-    # El modelo no entiende las fechas como "verano" o "invierno". Convertimos el
-    # dia del año en dos numeros (seno y coseno) para que entienda que el año es
-    # un ciclo: el 31 de diciembre y el 1 de enero estan pegados.
+    # El modelo no entiende las fechas como "verano" o "invierno". 
+    # Convertimos el dia del año en dos numeros (seno y coseno) para que entienda que el año es un ciclo: el 31 de diciembre y el 1 de enero estan pegados.
     temp["dia_sin"] = np.sin(2 * np.pi * temp["fecha"].dt.dayofyear / 365.25)
     temp["dia_cos"] = np.cos(2 * np.pi * temp["fecha"].dt.dayofyear / 365.25)
 
@@ -67,9 +65,7 @@ def _ventanas(df: pd.DataFrame, window: int) -> tuple[np.ndarray, np.ndarray]:
 
     filas_x: list[np.ndarray] = []
     filas_y: list[float] = []
-    # Recorremos el historico deslizando la ventana. En cada paso, la entrada es
-    # [seno, coseno, humedad del dia anterior, 20 temperaturas anteriores] y la
-    # respuesta correcta es la temperatura del dia siguiente a la ventana.
+    # Recorremos el historico moviendo la ventana. En cada paso, la entrada es [seno, coseno, humedad del dia anterior, 20 temperaturas anteriores] y la respuesta correcta es la temperatura del dia siguiente a la ventana.
     for i in range(len(temp) - window):
         filas_x.append(np.hstack([sin[i + window], cos[i + window], hr[i + window - 1], tmed[i : i + window]]))
         filas_y.append(tmed[i + window])
@@ -78,8 +74,7 @@ def _ventanas(df: pd.DataFrame, window: int) -> tuple[np.ndarray, np.ndarray]:
 
 
 class ModelTrainer:
-    # Entrena un modelo por estacion usando su historico ya limpio. La libreria
-    # que hace la "magia" de aprender es scikit-learn (sklearn).
+    # Entrena un modelo por estacion usando su historico ya limpio.
 
     def __init__(self, ruta_salida: str) -> None:
         self._ruta_salida = ruta_salida
@@ -99,14 +94,12 @@ class ModelTrainer:
         if len(x) <= _DIAS_TEST:
             return None
 
-        # Separamos los datos: casi todos para que el modelo aprenda (train), y
-        # el ultimo año guardado aparte para probar si acierta (test).
+        # Separamos los datos: casi todos para que el modelo aprenda (train), y el ultimo año guardado aparte para probar si acierta (test).
         x_train, x_test = x[:-_DIAS_TEST], x[-_DIAS_TEST:]
         y_train, y_test = y[:-_DIAS_TEST], y[-_DIAS_TEST:]
 
-        # Creamos el modelo Random Forest: junta 1000 "arboles de decision" y
-        # promedia sus respuestas. Los numeros de aqui (profundidad, etc.) son
-        # ajustes que probamos y que dan buen resultado.
+        # Creamos el modelo Random Forest: junta 1000 "arboles de decision" y promedia sus respuestas. 
+        # Los numeros de aqui (profundidad, etc.) son ajustes que probamos y que dan buen resultado.
         modelo = RandomForestRegressor(
             n_estimators=1000,
             max_depth=10,
