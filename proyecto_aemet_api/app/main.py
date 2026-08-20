@@ -13,6 +13,7 @@ from proyecto_aemet_api.database.session import cerrar_pool, crear_pool
 from proyecto_aemet_api.ingestion.loader import DataLoader
 from proyecto_aemet_api.ml.predictor import (
     RegistroModelosLazy,
+    crear_cargador_con_s3,
     crear_cargador_desde_disco,
     crear_medidor_tamano,
 )
@@ -38,8 +39,16 @@ async def lifespan(app: FastAPI):
     repositorio_mediciones = ObservationRepository(pool)
 
     # 3) Registro de modelos de ML con carga perezosa y limite de memoria.
+    # Si hay bucket S3 configurado, los modelos que falten en disco se bajan de
+    # la nube (en AWS los sube la Lambda de entrenamiento). Si no, solo disco.
+    if settings.s3_bucket_modelos:
+        cargador = crear_cargador_con_s3(
+            settings.ruta_modelos, settings.s3_bucket_modelos, settings.aws_region
+        )
+    else:
+        cargador = crear_cargador_desde_disco(settings.ruta_modelos)
     registro_modelos = RegistroModelosLazy(
-        cargador=crear_cargador_desde_disco(settings.ruta_modelos),
+        cargador=cargador,
         max_memoria_mb=settings.modelos_max_memoria_mb,
         obtener_tamano_mb=crear_medidor_tamano(
             settings.ruta_modelos, settings.modelo_tamano_defecto_mb

@@ -42,3 +42,17 @@ class IngestionService:
 
         limpio = self._transformer.transform(crudo)
         return await self._loader.cargar_mediciones(limpio)
+
+    async def cargar_mediciones_dia(self, retraso_dias: int = 5) -> int:
+        # Descarga las mediciones de UN SOLO dia: el de hoy menos `retraso_dias`.
+        # Es la ingesta diaria normal: la AEMET tarda unos 5 dias en publicar los
+        # datos definitivos de un dia, asi que cada dia pedimos el de hace 5.
+        # (Es lo mismo que hace la Lambda diaria de AWS.)
+        dia = date.today() - timedelta(days=retraso_dias)
+
+        crudo = self._cliente.obtener_mediciones(dia, dia)
+        if crudo.empty:
+            return 0
+
+        limpio = self._transformer.transform(crudo)
+        return await self._loader.cargar_mediciones(limpio)
