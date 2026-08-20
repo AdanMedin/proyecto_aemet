@@ -6,7 +6,6 @@ pydantic-settings
 
 # --- Base de datos ---
 asyncpg
-psycopg[binary]
 
 # --- Datos/ML ---
 pandas

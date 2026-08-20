@@ -45,6 +45,7 @@ proyecto_aemet_api/
 │   └── forecast_service.py     # busca estaciones y genera predicciones
 │
 └── scripts/                # herramientas para pruebas manuales
+    └── lambdas/            # funciones Lambda para AWS (producción): ingesta y entrenamiento sin pasar por la API
 ```
 
 ## Por qué está organizado así
@@ -83,6 +84,12 @@ El reentrenamiento se ejecuta cada 15 días, incorporando los datos más recient
 
 ## Despliegue del proyecto
 
+Hay dos formas de desplegar el sistema: en local con Docker (desarrollo) y en AWS (producción). Ambas comparten la misma base de código, pero la ingesta y el entrenamiento funcionan distinto en cada una.
+
+El flujo completo de cada entorno (qué pasa con un dato desde que nace en la AEMET hasta que se convierte en predicción) está explicado paso a paso en [docs/flujo.md](docs/flujo.md).
+
+### Local (Docker, desarrollo)
+
 El proyecto está dockerizado, con los contenedores ya configurados. Solo es necesario definir las variables de entorno en el archivo `.env`:
 
 ```bash
@@ -93,8 +100,35 @@ Esto levanta cuatro servicios:
 
 - **api** (puerto ****): la API. La documentación interactiva está disponible en `http://localhost:****/docs`.
 - **postgres** (puerto ****): la base de datos.
-- **scheduler**: el proceso encargado de programar las descargas automáticas.
+- **scheduler**: el proceso encargado de programar las descargas automáticas. Llama a la API por HTTP cada 5 días (ingesta) y cada 15 (reentrenamiento).
 - **pgadmin** (puerto ****): interfaz web para consultar la base de datos (opcional, útil para depuración).
+
+En local, toda la lógica (descarga AEMET, limpieza, guardado, entrenamiento) vive dentro de la API, en `proyecto_aemet_api/ingestion/`, `services/` y `ml/`.
+
+### Producción (AWS)
+
+En AWS la API solo sirve predicciones. La ingesta y el entrenamiento se hacen con funciones Lambda independientes (no pasan por la API), y los modelos se guardan en S3:
+
+- **RDS PostgreSQL**: la base de datos, mismo esquema que en local (`docker/postgres/bd_meteo_v2.sql`).
+- **S3**: dos buckets, uno para los datos crudos (pickles) y otro para los modelos entrenados (.joblib).
+- **Lambdas** (código en `proyecto_aemet_api/scripts/lambdas/`, listas para pegar en la consola de AWS):
+
+| Lambda | Frecuencia | Qué hace |
+|---|---|---|
+| `lambda_ingesta_aemet` | Diaria (EventBridge) | Descarga mediciones del último día disponible (hoy - 5 días) y guarda el pickle crudo en S3 |
+| `lambda_procesamiento_ingesta` | Automática (trigger S3 `raw/`) | Lee el pickle, limpia los datos y los inserta en RDS |
+| `lambda_ingesta_estaciones` | Mensual (EventBridge) | Descarga el inventario de estaciones y guarda el pickle en S3 |
+| `lambda_procesamiento_estaciones` | Automática (trigger S3 `estaciones/`) | Lee el pickle, convierte las coordenadas y actualiza la tabla de estaciones |
+| `lambda_entrenamiento_standalone` | Cada 15 días (EventBridge) | Lee el histórico de RDS, entrena los modelos y los sube a S3 |
+
+El flujo es: EventBridge despierta a la Lambda de descarga, que deja el pickle en S3; S3 dispara automáticamente la Lambda de procesamiento, que escribe en RDS. Las mediciones de estaciones que no existan en la tabla `estaciones` se descartan (la clave foránea lo exige), así que la carga inicial del inventario debe hacerse antes que la primera ingesta de mediciones.
+
+**Orden de arranque en AWS (la primera vez):**
+
+1. Crear el RDS y ejecutar `docker/postgres/bd_meteo_v2.sql` para crear las tablas.
+2. Invocar manualmente `lambda_ingesta_estaciones` (con evento `{}`) para llenar la tabla de estaciones.
+3. Activar el scheduler diario de mediciones.
+4. Activar el scheduler mensual de estaciones y el de entrenamiento.
 
 ## Configuración
 

@@ -4,11 +4,12 @@ Este modulo es la fuente de verdad sobre el formato de entrada del
 modelo: tanto el entrenamiento como la prediccion deben usar construir_features
 para garantizar que las columnas van en el mismo orden.
 
-Contrato de entrada de cada modelo (uno por estacion):
-  - tmed de los DIAS_HISTORICO dias registrados anteriores (orden cronologico)
-  - hrmedia de esos mismos dias (mismo orden)
+Contrato de entrada de cada modelo (uno por estacion), el MISMO que usa
+ml/trainer.py al entrenar:
   - sin y cos del dia a predecir (codificacion ciclica de la fecha)
-Total = DIAS_HISTORICO + DIAS_HISTORICO + 2 valores.
+  - hrmedia del ultimo dia registrado
+  - tmed de los DIAS_HISTORICO dias registrados anteriores (orden cronologico)
+Total = 2 + 1 + DIAS_HISTORICO valores (23 columnas).
 """
 from __future__ import annotations
 
@@ -36,6 +37,9 @@ def construir_features(
     """Monta el vector de entrada (1 fila) que espera "modelo.predict".
     tmed y hrmedia deben traer exactamente DIAS_HISTORICO valores en
     orden cronologico (del mas antiguo al mas reciente).
+
+    El orden de columnas replica el de trainer._ventanas:
+    [sin_dia, cos_dia, hrmedia_mas_reciente, tmed_1 ... tmed_20]
     """
     if len(tmed) != DIAS_HISTORICO or len(hrmedia) != DIAS_HISTORICO:
         raise ValueError(
@@ -44,6 +48,6 @@ def construir_features(
         )
 
     sin_dia, cos_dia = _sin_cos_dia(fecha_objetivo)
-    fila = [*tmed, *hrmedia, sin_dia, cos_dia]
+    fila = [sin_dia, cos_dia, hrmedia[-1], *tmed]
     # reshape(1, -1): una sola muestra con todas las columnas (lo que espera sklearn).
     return np.array(fila, dtype=np.float64).reshape(1, -1)
