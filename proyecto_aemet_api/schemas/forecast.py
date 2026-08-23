@@ -29,5 +29,14 @@ class PrediccionTemperaturaOut(BaseModel):
     latitud: float
     longitud: float
     distancia_km: float
-    fecha: date  # dia predicho (siguiente a la ultima medicion)
+    fecha: date  # dia predicho (mañana)
     temperatura_prevista: float  # tmed prevista en grados Celsius
+
+# Respuesta completa del endpoint de prediccion: las estaciones con su
+# prediccion individual + la temperatura media ponderada por distancia.
+class PrediccionResponse(BaseModel):
+    fecha: date  # dia predicho (mañana)
+    # Media ponderada: cada estacion pesa 1/distancia (mas cerca = mas peso).
+    # Asi una estacion a 1km influye 10 veces mas que una a 10km.
+    temperatura_ponderada: float
+    estaciones: list[PrediccionTemperaturaOut]

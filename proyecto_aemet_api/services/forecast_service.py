@@ -74,11 +74,23 @@ class CacheEstaciones:
     Mantiene en memoria las coordenadas de todas las estaciones para resolver
     busquedas de cercania sin ir a la base de datos en cada peticion. Se
     refresca sola si pasan "ttl_segundos" desde la ultima carga.
+
+    Solo carga estaciones que tengan:
+      - datos recientes (la ultima medicion no puede tener mas de 7 dias)
+      - modelo entrenado (el repositorio de modelos dice cuales existen)
     """
 
-    def __init__(self, repositorio: StationRepository, ttl_segundos: float = 3600.0) -> None:
+    def __init__(
+        self,
+        repositorio: StationRepository,
+        ttl_segundos: float = 3600.0,
+        listar_modelos: Callable[[], set[str]] | None = None,
+    ) -> None:
         self._repositorio = repositorio # de aqui saca las estaciones (capa BD)
         self._ttl = ttl_segundos
+        # Funcion que devuelve los indicativos de las estaciones con modelo.
+        # Si no se pasa, no filtra por modelo (todas las estaciones con datos).
+        self._listar_modelos = listar_modelos
         self._data: Optional[_EstacionesData] = None
         self._cargado_en = 0.0
         self._lock = asyncio.Lock() # evita recargas simultaneas que se pisen
@@ -86,6 +98,12 @@ class CacheEstaciones:
     async def _cargar(self) -> None:
         # Pide las estaciones al repositorio y las convierte en arrays de numpy.
         rows = await self._repositorio.obtener_estaciones_con_coordenadas()
+
+        # Filtra: solo estaciones que tengan modelo entrenado.
+        if self._listar_modelos is not None:
+            con_modelo = self._listar_modelos()
+            rows = [r for r in rows if r["indicativo"] in con_modelo]
+
         self._data = _EstacionesData(
             indicativos=np.array([r["indicativo"] for r in rows], dtype=object),
             nombres=np.array([r["nombre"] for r in rows], dtype=object),
@@ -238,12 +256,23 @@ class PredictorMeteo:
         if len(mediciones) < DIAS_HISTORICO:
             return None   # no hay historico suficiente para predecir
 
+        # La ultima medicion de la ventana no puede ser demasiado vieja:
+        # si tiene mas de 7 dias, la ventana no vale para predecir mañana
+        # (seria como adivinar el tiempo de mañana mirando el de hace un mes).
+        ultima_fecha = mediciones[-1]["fecha"]
+        if (date.today() - ultima_fecha).days > 7:
+            return None   # datos demasiado antiguos
+
         # 2) separar las columnas que necesita el modelo.
         tmed = [float(m["tmed"]) for m in mediciones]
         hrmedia = [float(m["hrmedia"]) for m in mediciones]
 
-        # 3) el dia a predecir es el siguiente a la ultima medicion disponible.
-        fecha_objetivo = mediciones[-1]["fecha"] + timedelta(days=1)
+        # 3) el dia a predecir es MAÑANA (hoy + 1), no el dia siguiente a la
+        # ultima medicion. La AEMET publica los datos con unos 5 dias de
+        # retraso, asi que la ultima medicion es de hace 5 dias, pero el modelo
+        # se entreno asi: con los ultimos 20 dias disponibles predice el dia
+        # siguiente (que en la practica es mañana).
+        fecha_objetivo = date.today() + timedelta(days=1)
 
         # 4) construir el vector de entrada y pedir la prediccion al modelo.
         features = construir_features(tmed, hrmedia, fecha_objetivo)

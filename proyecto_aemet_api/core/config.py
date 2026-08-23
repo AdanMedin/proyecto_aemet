@@ -3,10 +3,15 @@
 from functools import lru_cache
 from pathlib import Path
 
+from functools import lru_cache
+from pathlib import Path
+
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Raíz del proyecto (2 niveles arriba de este archivo: core/ -> proyecto_aemet_api/ -> raíz)
 _ENV_FILE = Path(__file__).parents[2] / ".env"
+load_dotenv(_ENV_FILE)  # Carga las variables de entorno del .env en el entorno de ejecución (os.environ)
 
 class Settings(BaseSettings):
     # BaseSettings lee automaticamente estos valores de variables de entorno o de un archivo .env, asi no dejamos contrasenhas escritas en el codigo.
@@ -29,9 +34,30 @@ class Settings(BaseSettings):
     estaciones_ttl_segundos: float = 3600.0
 
     # --- AWS S3 (subida de modelos) ---
-    # Bucket donde el reentrenamiento sube los .joblib. Vacio = desactivado (los modelos se quedan solo en disco local).
+    # Todo esto se lee del .env (aqui no va nada de AWS escrito).
+    # Bucket donde estan los modelos .joblib en la nube. Vacio = desactivado
+    # (los modelos se leen solo del disco local, modo desarrollo).
     s3_bucket_modelos: str = ""
     aws_region: str = "eu-west-1"
+
+    # Subcarpeta dentro del bucket donde estan los modelos.
+    s3_prefijo_modelos: str = "modelos"
+
+    # Subcarpeta de respaldo: aqui se mueven los modelos actuales justo antes
+    # de subir los nuevos (por si algo sale mal). Solo guarda UNA version.
+    s3_prefijo_modelos_historicos: str = "modelos_historicos"
+
+    # Carpeta local de respaldo de modelos (mismo comportamiento sin S3).
+    ruta_modelos_historicos: str = "proyecto_aemet_api/ml/artifacts_historicos"
+
+    # --- AWS S3 (datos crudos de AEMET) ---
+    # Bucket donde se guardan los pickles con los datos descargados (sin limpiar).
+    # Vacio = no se suben a la nube, se quedan solo en disco local.
+    s3_bucket_datos_raw: str = ""
+    s3_prefijo_datos_raw: str = "raw"
+
+    # Carpeta local donde se guardan los datos crudos descargados (pickle + csv).
+    ruta_datos_raw: str = "proyecto_aemet_api/resources"
 
 @lru_cache
 def get_settings() -> Settings:

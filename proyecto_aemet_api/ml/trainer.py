@@ -5,7 +5,13 @@ Logica adaptada del boceto scripts/MODEL.ipynb a la BD del proyecto
 
 Contrato de features (debe coincidir con ml/dataset.construir_features):
     X = [sin_dia, cos_dia, hrmedia_ultimo, tmed_d1..tmed_d20]  (23 columnas)
-    y = tmed del dia siguiente
+    y = tmed del dia objetivo
+
+IMPORTANTE: el dia objetivo NO es el siguiente a la ventana, sino 6 dias
+despues. Por que: la AEMET publica los datos con unos 5 dias de retraso, asi
+que cuando la API predice "mañana", la ventana de datos que tiene disponible
+acaba en hoy-5. Entrenar con este desfase hace que el modelo aprenda
+exactamente la situacion en la que va a trabajar en produccion.
 """
 from __future__ import annotations
 
@@ -26,6 +32,11 @@ _MIN_FILAS = 1500
 _DIAS_TEST = 365
 # Descartamos los primeros dias porque a veces tienen datos de peor calidad.
 _SKIP_INICIAL = 10
+
+# Cuantos dias despues del final de la ventana esta el dia a predecir.
+# En produccion la ventana acaba en hoy-5 (retraso de la AEMET) y se predice
+# mañana (hoy+1): 6 dias de salto. El modelo se entrena con ese mismo salto.
+_DIAS_ADELANTE = 6
 
 # Las columnas de la base de datos que el modelo usa (nombres de bd_meteo_v2.sql).
 COLUMNAS_ENTRENAMIENTO = ["fecha", "tmed", "hrmedia"]
@@ -65,10 +76,16 @@ def _ventanas(df: pd.DataFrame, window: int) -> tuple[np.ndarray, np.ndarray]:
 
     filas_x: list[np.ndarray] = []
     filas_y: list[float] = []
-    # Recorremos el historico moviendo la ventana. En cada paso, la entrada es [seno, coseno, humedad del dia anterior, 20 temperaturas anteriores] y la respuesta correcta es la temperatura del dia siguiente a la ventana.
-    for i in range(len(temp) - window):
-        filas_x.append(np.hstack([sin[i + window], cos[i + window], hr[i + window - 1], tmed[i : i + window]]))
-        filas_y.append(tmed[i + window])
+    # Recorremos el historico moviendo la ventana. En cada paso, la entrada es
+    # [seno, coseno del dia a predecir, humedad del ultimo dia de la ventana,
+    # 20 temperaturas de la ventana] y la respuesta correcta es la temperatura
+    # del dia objetivo, que esta _DIAS_ADELANTE dias despues del final de la
+    # ventana (replicando el desfase real de la AEMET en produccion).
+    for i in range(len(temp) - window - _DIAS_ADELANTE + 1):
+        i_ultimo_ventana = i + window - 1     # ultimo dia que ve el modelo
+        i_objetivo = i + window - 1 + _DIAS_ADELANTE  # dia a predecir
+        filas_x.append(np.hstack([sin[i_objetivo], cos[i_objetivo], hr[i_ultimo_ventana], tmed[i : i + window]]))
+        filas_y.append(tmed[i_objetivo])
 
     return np.array(filas_x, dtype=float), np.array(filas_y, dtype=float)
 
