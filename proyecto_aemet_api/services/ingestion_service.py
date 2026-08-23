@@ -70,11 +70,14 @@ class IngestionService:
             os.makedirs(ruta_local, exist_ok=True)
             # Borra el pickle de estaciones anterior (solo guardamos uno).
             for f in os.listdir(ruta_local):
-                if f == nombre:
+                if f in (nombre, "estaciones.csv"):
                     os.remove(os.path.join(ruta_local, f))
             ruta_pickle = os.path.join(ruta_local, nombre)
+            ruta_csv = os.path.join(ruta_local, "estaciones.csv")
             crudo.to_pickle(ruta_pickle)
+            crudo.to_csv(ruta_csv, index=False)  # EN LOCAL GUARDAMOS CSV TAMBIEN
             resultado["ruta_pickle"] = ruta_pickle
+            resultado["ruta_csv"] = ruta_csv
 
         # 4) escribe en la BD si se pidio.
         if guardar:
@@ -82,24 +85,64 @@ class IngestionService:
 
         return resultado
 
-    async def cargar_mediciones(self, dias: int, guardar: bool = True) -> int:
+    async def cargar_mediciones(
+        self, 
+        dias: int, 
+        guardar: bool = True,
+        ruta_local: str | None = None,
+        s3_bucket: str = "",
+        s3_region: str = "eu-west-1",
+    ) -> dict:
         # Descarga las mediciones de los ultimos `dias` dias DISPONIBLES.
         # La AEMET publica con unos 5 dias de retraso, asi que el rango acaba
         # en hoy-5 (el ultimo dia publicado), no en hoy: pedir dias mas
         # recientes no devolveria nada.
-        # Por ejemplo con dias=30 trae desde hoy-34 hasta hoy-5.
+        #
+        # Siempre guarda el pickle crudo en raw/<fecha>/mediciones.pkl (S3 o disco).
+        # Con guardar=True ademas escribe en la BD (upsert en meteo.mediciones_diarias).
+        import os
+        import boto3
+
         fin = date.today() - timedelta(days=5)  # ultimo dia publicado
         inicio = fin - timedelta(days=dias - 1)
 
         crudo = self._cliente.obtener_mediciones(inicio, fin)
+        resultado = {"mediciones": len(crudo)}
+        
         if crudo.empty:
-            # Si la AEMET no devolvio nada (raro, pero puede pasar), no hay nada que guardar. Devolvemos 0 para indicar "cero filas cargadas".
-            return 0
+            return resultado
 
         limpio = self._transformer.transform(crudo)
-        if not guardar:
-            return len(limpio)
-        return await self._loader.cargar_mediciones(limpio)
+        resultado["mediciones_limpias"] = len(limpio)
+
+        # Guardar el pickle crudo en raw/<fecha>/mediciones.pkl
+        if s3_bucket:
+            s3 = boto3.client("s3", region_name=s3_region)
+            fecha_str = fin.isoformat()
+            key = f"raw/{fecha_str}/mediciones.pkl"
+            s3.put_object(
+                Bucket=s3_bucket,
+                Key=key,
+                Body=crudo.to_pickle(None),
+                ContentType="application/octet-stream",
+            )
+            resultado["s3_key"] = key
+        elif ruta_local:
+            fecha_str = fin.isoformat()
+            ruta_fecha = os.path.join(ruta_local, fecha_str)
+            os.makedirs(ruta_fecha, exist_ok=True)
+            ruta_pickle = os.path.join(ruta_fecha, "mediciones.pkl")
+            ruta_csv = os.path.join(ruta_fecha, "mediciones.csv")
+            crudo.to_pickle(ruta_pickle)
+            crudo.to_csv(ruta_csv, index=False)  # EN LOCAL GUARDAMOS CSV TAMBIEN
+            resultado["ruta_pickle"] = ruta_pickle
+            resultado["ruta_csv"] = ruta_csv
+
+        # Escribir en BD si se pidio
+        if guardar:
+            resultado["mediciones_bd"] = await self._loader.cargar_mediciones(limpio)
+        
+        return resultado
 
     async def cargar_historico_completo(
         self,
@@ -129,9 +172,9 @@ class IngestionService:
         import boto3
 
         # La AEMET tiene datos desde 2016 mas o menos (depende de la estacion).
-        # Pedimos desde 2016 hasta hoy.
+        # Pedimos desde 2016 hasta hoy - 5 dias.
         inicio = date(2016, 1, 1)
-        fin = date.today()
+        fin = date.today()- timedelta(days=5)
 
         crudo = self._cliente.obtener_mediciones(inicio, fin)
         if crudo.empty:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import time
 from datetime import date, timedelta
 
 import pandas as pd
@@ -66,6 +67,9 @@ class AemetClient:
             bloques.append(pd.DataFrame(self._resolver_descarga(url)))
             # El siguiente bloque empieza justo despues de donde acabo este.
             cursor = fin_bloque + timedelta(days=1)
+            # Pausa entre peticiones para no abusar de la API (evita 429 Too Many Requests)
+            if cursor <= fecha_fin:
+                time.sleep(3.5)  # 3.5 segundos de pausa entre bloques
 
         if not bloques:
             return pd.DataFrame() # no se descargo nada: tabla vacia

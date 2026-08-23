@@ -1,19 +1,49 @@
-# Entornos y cachés de Python
-.venv/
-**/__pycache__/
-**/*.pyc
+# ============================================================
+# BUILD: Excluir archivos que NO necesita la imagen Docker
+# (se montan en volumen o son solo para desarrollo/AWS)
+# ============================================================
 
-# Control de versiones y config local
-.git/
+# Control de versiones
+.git
 .gitignore
+.gitattributes
+
+# Configuración local (secretos)
 .env
+.env.*
 
-# Datos pesados y modelos (no hacen falta en la imagen; se montan por volumen)
+# Python caché
+__pycache__
+**/__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Datos (se montan por volumen en docker-compose.yml)
 proyecto_aemet_api/resources/
-proyecto_aemet_api/ml/artifacts/*.joblib
+proyecto_aemet_api/ml/artifacts/
+proyecto_aemet_api/ml/artifacts_historicos/
 
-# Cosas que no necesita la API en runtime
-tests/
-streamlit_app/
+# Scripts específicos de AWS (Lambda)
+proyecto_aemet_api/scripts/lambdas/
+proyecto_aemet_api/scripts/descargar_modelos.py
+proyecto_aemet_api/scripts/train_model.py
+proyecto_aemet_api/scripts/run_ingestion.py
+
+# Desarrollo (notebooks, tests, streamlit)
 **/*.ipynb
+**/*.ipynb_checkpoints
+streamlit_app/
+tests/
+
+# Documentación (no necesaria en runtime)
 *.md
+docs/
+README.md
+
+# IDE
+.vscode
+.idea
+*.swp
+.DS_Store

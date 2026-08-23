@@ -56,8 +56,14 @@ class Settings(BaseSettings):
     s3_bucket_datos_raw: str = ""
     s3_prefijo_datos_raw: str = "raw"
 
-    # Carpeta local donde se guardan los datos crudos descargados (pickle + csv).
+    # Carpeta raiz local para datos: local espeja la estructura de S3
+    # - raw/: mediciones diarias + historico completo
+    # - estaciones/: inventario de estaciones
     ruta_datos_raw: str = "proyecto_aemet_api/resources"
+    
+    # Subcarpetas especificas (espejo de S3)
+    ruta_datos_raw_mediciones: str = "proyecto_aemet_api/resources/raw"
+    ruta_datos_raw_estaciones: str = "proyecto_aemet_api/resources/estaciones"
 
 @lru_cache
 def get_settings() -> Settings:

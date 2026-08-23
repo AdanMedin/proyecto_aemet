@@ -53,9 +53,16 @@ services:
       # Mi API escucha en puerto 8000. Así accedo desde http://localhost:8000
       - "8000:8000"
     volumes:
-      # Los modelos ML entrenados están en mi ordenador (./proyecto_aemet_api/ml/artifacts).
-      # Los enlaza aquí para que la API pueda usarlos sin necesidad de reconstruir la imagen cada vez.
+      # Modelos ML actuales: se generan al entrenar, se cargan en memoria para predicciones
       - ./proyecto_aemet_api/ml/artifacts:/app/proyecto_aemet_api/ml/artifacts
+      # Respaldo de modelos anteriores (una versión). Solo se toca al reentrenar.
+      - ./proyecto_aemet_api/ml/artifacts_historicos:/app/proyecto_aemet_api/ml/artifacts_historicos
+      # Datos de ingesta: espeja estructura S3
+      #   - raw/<fecha>/: pickles diarios de mediciones
+      #   - raw/: historico_*.pkl, historico_*.csv
+      #   - estaciones/: estaciones.pkl
+      - ./proyecto_aemet_api/resources/raw:/app/proyecto_aemet_api/resources/raw
+      - ./proyecto_aemet_api/resources/estaciones:/app/proyecto_aemet_api/resources/estaciones
     depends_on:
       # La API espera a que PostgreSQL esté listo (service_healthy) antes de empezar.
       postgres:
