@@ -19,7 +19,7 @@ se ejecuta sola (evento ObjectCreated). Si la limpieza falla, el dato crudo
 sigue en S3 y se puede reprocesar sin volver a pedirlo a la AEMET.
 
 Es la equivalente en AWS a lo que en local hace el scheduler llamando a
-POST /api/v1/admin/ingestar?diario=true.
+POST /api/v1/admin/ingestar?dias=1.
 
 CUANDO SE EJECUTA
 -----------------

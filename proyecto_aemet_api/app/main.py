@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 from contextlib import asynccontextmanager
+from pathlib import Path
+
 from fastapi import FastAPI
 from proyecto_aemet_api.app.api.v1.router import api_router
 from proyecto_aemet_api.core.config import get_settings
@@ -16,6 +18,7 @@ from proyecto_aemet_api.ml.predictor import (
     crear_cargador_con_s3,
     crear_cargador_desde_disco,
     crear_medidor_tamano,
+    crear_medidor_tamano_s3,
 )
 from proyecto_aemet_api.services.forecast_service import CacheEstaciones, PredictorMeteo
 from proyecto_aemet_api.services.ingestion_service import IngestionService
@@ -32,27 +35,51 @@ async def lifespan(app: FastAPI):
     pool = await crear_pool(settings.database_dsn)
 
     # 2) Capa de datos: cache de estaciones + repositorio de mediciones diarias.
+    # La cache solo carga estaciones que tengan datos recientes Y modelo.
     repositorio_estaciones = StationRepository(pool)
+
+    # Funcion que dice que estaciones tienen modelo (para filtrar la cache).
+    if settings.s3_bucket_modelos:
+        from proyecto_aemet_api.ml.s3_storage import S3Storage
+        _s3 = S3Storage(settings.s3_bucket_modelos, settings.aws_region, settings.s3_prefijo_modelos)
+        listar_modelos = _s3.listar_modelos
+    else:
+        # En local: las que tengan .joblib en la carpeta de artefactos.
+        def listar_modelos() -> set[str]:
+            ruta = Path(settings.ruta_modelos)
+            return {f.stem for f in ruta.glob("*.joblib")}
+
     cache_estaciones = CacheEstaciones(
-        repositorio_estaciones, ttl_segundos=settings.estaciones_ttl_segundos
+        repositorio_estaciones,
+        ttl_segundos=settings.estaciones_ttl_segundos,
+        listar_modelos=listar_modelos,
     )
     repositorio_mediciones = ObservationRepository(pool)
 
     # 3) Registro de modelos de ML con carga perezosa y limite de memoria.
-    # Si hay bucket S3 configurado, los modelos que falten en disco se bajan de
-    # la nube (en AWS los sube la Lambda de entrenamiento). Si no, solo disco.
+    # Si hay bucket S3 configurado, los modelos se leen de la nube DIRECTO A
+    # MEMORIA (sin ocupar disco). Si no, se leen de la carpeta local.
     if settings.s3_bucket_modelos:
         cargador = crear_cargador_con_s3(
-            settings.ruta_modelos, settings.s3_bucket_modelos, settings.aws_region
+            settings.s3_bucket_modelos,
+            settings.aws_region,
+            settings.s3_prefijo_modelos,
+        )
+        medidor = crear_medidor_tamano_s3(
+            settings.s3_bucket_modelos,
+            settings.aws_region,
+            settings.s3_prefijo_modelos,
+            settings.modelo_tamano_defecto_mb,
         )
     else:
         cargador = crear_cargador_desde_disco(settings.ruta_modelos)
+        medidor = crear_medidor_tamano(
+            settings.ruta_modelos, settings.modelo_tamano_defecto_mb
+        )
     registro_modelos = RegistroModelosLazy(
         cargador=cargador,
         max_memoria_mb=settings.modelos_max_memoria_mb,
-        obtener_tamano_mb=crear_medidor_tamano(
-            settings.ruta_modelos, settings.modelo_tamano_defecto_mb
-        ),
+        obtener_tamano_mb=medidor,
     )
 
     # 4) Servicio que junta cache de estaciones, modelos y mediciones de la BD.
@@ -65,6 +92,9 @@ async def lifespan(app: FastAPI):
         ruta_salida=settings.ruta_modelos,
         s3_bucket=settings.s3_bucket_modelos,
         aws_region=settings.aws_region,
+        s3_prefijo=settings.s3_prefijo_modelos,
+        s3_prefijo_historico=settings.s3_prefijo_modelos_historicos,
+        ruta_historicos=settings.ruta_modelos_historicos,
     )
 
     # Guardamos en app.state lo que necesitaremos durante las peticiones. 
@@ -73,6 +103,7 @@ async def lifespan(app: FastAPI):
     app.state.predictor = predictor
     app.state.ingestion = ingestion
     app.state.training = training
+    app.state.settings = settings  # los endpoints de admin lo usan para rutas y buckets
 
     yield  # aqui la app esta viva atendiendo peticiones, despues de esto se ejecuta el codigo de apagado.
 

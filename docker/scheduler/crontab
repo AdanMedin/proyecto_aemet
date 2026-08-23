@@ -4,13 +4,13 @@
 
 # TAREA 1: Descargar las mediciones diarias de AEMET (ingesta)
 # Ejecuta: todos los dias a las 3:00 AM
-# Qué hace: llama a la API con diario=true, que descarga SOLO las mediciones
-# del dia de hoy menos 5. La AEMET tarda unos 5 dias en publicar los datos
-# definitivos de un dia, asi que cada dia pedimos el de hace 5.
+# Qué hace: llama a la API con dias=1, que descarga SOLO las mediciones
+# del ultimo dia publicado (hoy menos 5; la AEMET tarda unos 5 dias en subir
+# los datos definitivos de un dia).
 # (En AWS hace lo mismo la Lambda diaria lambda_ingesta_aemet.)
 # Logs: guarda todo en /var/log/ingesta.log
 
-0 3 * * * curl -sf -X POST "http://api:8000/api/v1/admin/ingestar?diario=true" >> /var/log/ingesta.log 2>&1
+0 3 * * * curl -sf -X POST "http://api:8000/api/v1/admin/ingestar?dias=1&guardar_bd=true" >> /var/log/ingesta.log 2>&1
 
 # TAREA 2: Actualizar el inventario de estaciones
 # Ejecuta: el día 1 de cada mes a las 2:00 AM
@@ -19,11 +19,13 @@
 # Sin esto, las mediciones de estaciones nuevas se rechazarían por la clave foránea.
 # Logs: guarda todo en /var/log/estaciones.log
 
-0 2 1 * * curl -sf -X POST "http://api:8000/api/v1/admin/ingestar?dias=1&estaciones=true" >> /var/log/estaciones.log 2>&1
+0 2 1 * * curl -sf -X POST "http://api:8000/api/v1/admin/ingestar?estaciones=true&guardar_bd=true" >> /var/log/estaciones.log 2>&1
 
 # TAREA 3: Reentrenar el modelo de predicción
-# Ejecuta: cada 15 días a las 4:00 AM (una hora después de la ingesta, para que tenga datos nuevos)
-# Qué hace: llama a la API con método POST en /api/v1/admin/reentrenar
+# Ejecuta: el día 1 de enero y julio a las 4:00 AM (cada 6 meses).
+# Los modelos aprenden patrones anuales, asi que con dos reentrenos al año
+# basta. Tambien se puede lanzar a mano cuando se quiera con:
+#   curl -X POST "http://api:8000/api/v1/admin/reentrenar"
 # Logs: guarda todo en /var/log/entrenamiento.log
 
-0 4 */15 * * curl -sf -X POST "http://api:8000/api/v1/admin/reentrenar" >> /var/log/entrenamiento.log 2>&1
+0 4 1 1,7 * curl -sf -X POST "http://api:8000/api/v1/admin/reentrenar" >> /var/log/entrenamiento.log 2>&1

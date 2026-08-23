@@ -3,12 +3,16 @@
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from proyecto_aemet_api.app.dependencies import get_predictor
-from proyecto_aemet_api.schemas.forecast import PrediccionRequest, PrediccionTemperaturaOut
+from proyecto_aemet_api.schemas.forecast import (
+    PrediccionRequest,
+    PrediccionResponse,
+    PrediccionTemperaturaOut,
+)
 from proyecto_aemet_api.services.forecast_service import PredictorMeteo
 
 router = APIRouter()
 
-@router.post("/prediccion", response_model=list[PrediccionTemperaturaOut])
+@router.post("/prediccion", response_model=PrediccionResponse)
 async def prediccion(
     req: PrediccionRequest,
     predictor: PredictorMeteo = Depends(get_predictor),
@@ -29,7 +33,7 @@ async def prediccion(
         )
 
     # Traducimos las fichas internas al esquema de salida que ve el cliente.
-    return [
+    estaciones = [
         PrediccionTemperaturaOut(
             indicativo=r.estacion.indicativo,
             nombre=r.estacion.nombre,
@@ -42,3 +46,25 @@ async def prediccion(
         )
         for r in resultados
     ]
+
+    # Temperatura media ponderada por distancia (inversa): 1/distancia.
+    # Una estacion a 1km pesa 10 veces mas que una a 10km.
+    #
+    # EXCEPCION: si hay alguna estacion a menos de 0.5 km del punto pedido,
+    # se considera que el punto ES esa estacion (o esta practicamente encima),
+    # y se devuelve su prediccion directamente, sin mezclar con las demas.
+    cercana = next((e for e in estaciones if e.distancia_km < 0.5), None)
+    if cercana is not None:
+        temperatura_ponderada = cercana.temperatura_prevista
+    else:
+        pesos = [1.0 / max(e.distancia_km, 0.1) for e in estaciones]
+        suma_pesos = sum(pesos)
+        temperatura_ponderada = sum(
+            e.temperatura_prevista * p for e, p in zip(estaciones, pesos)
+        ) / suma_pesos
+
+    return PrediccionResponse(
+        fecha=estaciones[0].fecha,  # todas predicen el mismo dia (mañana)
+        temperatura_ponderada=round(temperatura_ponderada, 1),
+        estaciones=estaciones,
+    )

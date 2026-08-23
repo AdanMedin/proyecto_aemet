@@ -31,7 +31,9 @@ def main() -> None:
 
     respuesta = requests.post(
         f"{_API}/api/v1/admin/ingestar",
-        params={"dias": args.dias, "estaciones": args.estaciones},
+        # guardar_bd=true: el script es para cargar datos de verdad en la BD
+        # (en el endpoint el default es false, para que sea seguro probarlo).
+        params={"dias": args.dias, "estaciones": args.estaciones, "guardar_bd": True},
         timeout=600,
     )
     respuesta.raise_for_status()

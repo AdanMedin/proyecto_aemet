@@ -14,13 +14,23 @@ Replica exacta de ml/trainer.py + services/training_service.py del proyecto:
   - Solo entrena estaciones con al menos 1500 dias de datos (unos 4 años).
   - Entrada del modelo: 23 valores -> [seno y coseno del dia a predecir,
     humedad del ultimo dia, temperaturas de los 20 dias anteriores].
-  - Salida: la temperatura media del dia siguiente.
+  - Salida: la temperatura media del dia que esta 6 DIAS despues del final
+    de la ventana. Por que: la AEMET publica con unos 5 dias de retraso, asi
+    que cuando la API predice "mañana" la ventana acaba en hoy-5. Entrenar
+    con ese salto hace que el modelo aprenda la situacion real de produccion.
   - RandomForest con 1000 arboles, profundidad 10, min 10 muestras por hoja.
   - El ultimo año de datos se guarda aparte para medir el error con datos
     que el modelo no ha visto.
 IMPORTANTE: el .joblib guarda el modelo a pelo (sin dicts ni scalers), que es
 como lo espera ml/predictor.py de la API. Si se cambiara el formato, la API
 no podria predecir.
+
+RESPALDO DE LA VERSION ANTERIOR
+-------------------------------
+Antes de subir los modelos nuevos, los actuales del bucket se mueven a la
+carpeta historica (borrando el respaldo anterior: solo se guarda UNA
+version). Si la subida falla a medias, el historico tiene la version anterior
+completa para recuperarla.
 
 COMO LLEGAN LOS MODELOS A LA API
 --------------------------------
@@ -30,14 +40,17 @@ estacion y el modelo no esta en su disco local, la API lo descarga de S3
 
 CUANDO SE EJECUTA
 -----------------
-EventBridge Scheduler, cada 15 dias. Entrenar con datos nuevos cada dia no
-aporta: con dos semanas de datos nuevos el modelo mejora lo suficiente para
-que merezca la pena el coste de reentrenar.
+EventBridge Scheduler, cada 6 meses (el dia 1 de enero y julio). Los modelos
+aprenden patrones anuales, asi que con dos reentrenos al año basta. Tambien
+se puede invocar a mano (evento {}) cuando se quiera.
 
 VARIABLES DE ENTORNO
 --------------------
 - DATABASE_DSN: cadena de conexion al RDS.
 - S3_BUCKET_MODELOS: bucket donde se suben los modelos.
+- S3_PREFIJO_MODELOS: subcarpeta de los modelos (defecto "modelos").
+- S3_PREFIJO_MODELOS_HISTORICOS: subcarpeta del respaldo (defecto
+  "modelos_historicos").
 - AWS_REGION: region del bucket (defecto eu-west-1).
 - RUTA_MODELOS: carpeta temporal (defecto /tmp/modelos; en Lambda solo se
   puede escribir en /tmp).
@@ -50,7 +63,8 @@ CONFIGURACION EN AWS
   Si no cabe en 15 minutos, toca moverlo a AWS Batch o Fargate con este
   mismo codigo, o bajar n_estimators.
 - VPC: SI, misma VPC que el RDS y acceso al puerto 5432.
-- Permisos IAM: s3:PutObject sobre el bucket de modelos.
+- Permisos IAM: s3:PutObject, s3:GetObject, s3:DeleteObject y s3:ListBucket
+  sobre el bucket de modelos (el respaldo copia y borra objetos).
 - Dependencias a empaquetar: pandas, numpy, scikit-learn, joblib,
   psycopg2-binary.
 
@@ -89,6 +103,9 @@ _DIAS_TEST = 365
 _SKIP_INICIAL = 10
 # Ventana de días que mira el modelo (igual que trainer.py).
 _WINDOW = 20
+# Días después del final de la ventana que esta el dia a predecir (igual que
+# trainer.py: replica el desfase de la AEMET en produccion).
+_DIAS_ADELANTE = 6
 
 
 @dataclass
@@ -122,10 +139,13 @@ def _ventanas(df: pd.DataFrame, window: int) -> tuple[np.ndarray, np.ndarray]:
     # Recorremos el historico moviendo la ventana de 20 dias. En cada paso:
     # entrada = [seno, coseno del dia a predecir, humedad del ultimo dia de la
     # ventana, las 20 temperaturas de la ventana]; respuesta correcta = la
-    # temperatura del dia siguiente a la ventana.
-    for i in range(len(temp) - window):
-        filas_x.append(np.hstack([sin[i + window], cos[i + window], hr[i + window - 1], tmed[i : i + window]]))
-        filas_y.append(tmed[i + window])
+    # temperatura del dia que esta _DIAS_ADELANTE dias despues del final de
+    # la ventana (el mismo desfase que hay en produccion con la AEMET).
+    for i in range(len(temp) - window - _DIAS_ADELANTE + 1):
+        i_ultimo_ventana = i + window - 1
+        i_objetivo = i + window - 1 + _DIAS_ADELANTE
+        filas_x.append(np.hstack([sin[i_objetivo], cos[i_objetivo], hr[i_ultimo_ventana], tmed[i : i + window]]))
+        filas_y.append(tmed[i_objetivo])
 
     return np.array(filas_x, dtype=float), np.array(filas_y, dtype=float)
 
@@ -189,13 +209,22 @@ class ModelTrainer:
 # =====================================================================
 
 class S3Storage:
-    def __init__(self, bucket: str, region: str = "eu-west-1", prefix: str = "modelos"):
+    def __init__(self, bucket: str, region: str = "eu-west-1", prefix: str = "modelos", prefix_historico: str = "modelos_historicos"):
         self._bucket = bucket
         self._prefix = prefix.strip("/")
+        # Subcarpeta de respaldo: aqui se mueven los modelos actuales justo
+        # antes de subir los nuevos (por si algo sale mal).
+        self._prefix_historico = prefix_historico.strip("/")
         self._s3 = boto3.client("s3", region_name=region)
 
     def subir_carpeta(self, carpeta_local: str) -> int:
-        # Sube todos los .joblib como "modelos/<indicativo>.joblib"
+        # Sube todos los .joblib como "<prefijo>/<indicativo>.joblib".
+        # Antes de subir los nuevos, hace respaldo de los actuales:
+        #   1) borra lo que haya en la carpeta historica (solo UNA version)
+        #   2) mueve ahi los modelos actuales del bucket
+        #   3) sube los nuevos
+        self._mover_actuales_a_historico()
+
         subidos = 0
         for nombre in os.listdir(carpeta_local):
             if nombre.endswith(".joblib"):
@@ -208,6 +237,30 @@ class S3Storage:
                 except Exception as e:
                     logger.error(f"Error subiendo {key}: {str(e)}")
         return subidos
+
+    def _mover_actuales_a_historico(self) -> None:
+        # En S3 no existe "mover": hay que copiar al historico y borrar el original.
+        paginator = self._s3.get_paginator("list_objects_v2")
+
+        # 1) Borra el respaldo anterior (solo queremos UNA version historica).
+        for page in paginator.paginate(Bucket=self._bucket, Prefix=self._prefix_historico):
+            for obj in page.get("Contents", []):
+                self._s3.delete_object(Bucket=self._bucket, Key=obj["Key"])
+
+        # 2) Copia los modelos actuales al historico y borra los originales.
+        for page in paginator.paginate(Bucket=self._bucket, Prefix=self._prefix + "/"):
+            for obj in page.get("Contents", []):
+                key_vieja = obj["Key"]
+                if not key_vieja.endswith(".joblib"):
+                    continue
+                nombre = key_vieja[len(self._prefix) + 1 :]
+                key_nueva = f"{self._prefix_historico}/{nombre}"
+                self._s3.copy_object(
+                    Bucket=self._bucket,
+                    CopySource={"Bucket": self._bucket, "Key": key_vieja},
+                    Key=key_nueva,
+                )
+                self._s3.delete_object(Bucket=self._bucket, Key=key_vieja)
 
 
 # =====================================================================
@@ -226,6 +279,8 @@ def entrenar() -> dict:
     dsn = os.environ["DATABASE_DSN"]
     bucket = os.environ.get("S3_BUCKET_MODELOS", "")
     region = os.environ.get("AWS_REGION", "eu-west-1")
+    prefijo = os.environ.get("S3_PREFIJO_MODELOS", "modelos")
+    prefijo_historico = os.environ.get("S3_PREFIJO_MODELOS_HISTORICOS", "modelos_historicos")
     # En Lambda solo se puede escribir en /tmp; de ahi se suben a S3.
     ruta_modelos = os.environ.get("RUTA_MODELOS", "/tmp/modelos")
 
@@ -267,10 +322,10 @@ def entrenar() -> dict:
     # 3) Guarda métricas (igual que training_service.py)
     joblib.dump(metricas, os.path.join(ruta_modelos, "metricas_modelos.joblib"))
 
-    # 4) Sube a S3 si hay bucket configurado
+    # 4) Sube a S3 si hay bucket configurado (con respaldo de la version anterior)
     subidos = 0
     if bucket:
-        subidos = S3Storage(bucket, region).subir_carpeta(ruta_modelos)
+        subidos = S3Storage(bucket, region, prefijo, prefijo_historico).subir_carpeta(ruta_modelos)
         logger.info(f"Subidos {subidos} archivos a S3")
 
     return {

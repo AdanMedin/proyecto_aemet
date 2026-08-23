@@ -115,25 +115,29 @@ def crear_cargador_desde_disco(ruta_modelos: str) -> CargadorModelo:
     return cargar
 
 
-def crear_cargador_con_s3(ruta_modelos: str, bucket: str, region: str) -> CargadorModelo:
-    # Igual que el cargador de disco, pero si el modelo no esta en local lo baja
-    # de S3 antes (en AWS los modelos los sube la Lambda de entrenamiento, y la
-    # API los va descargando la primera vez que se piden).
-    # En local (sin bucket) no se usa: se usa el de disco de arriba.
+def crear_cargador_con_s3(bucket: str, region: str, prefix: str = "modelos") -> CargadorModelo:
+    # Carga los modelos desde S3 DIRECTO A MEMORIA, sin tocar el disco.
+    # Los que mas se usan se quedan en la cache en RAM (RegistroModelosLazy se
+    # encarga de eso, con su limite de memoria); si la cache expulsa uno, la
+    # proxima vez se vuelve a descargar de S3. El disco del servidor no se
+    # llena nunca, por muchos modelos que haya en la nube.
     from proyecto_aemet_api.ml.s3_storage import S3Storage
 
-    s3 = S3Storage(bucket, region)
+    s3 = S3Storage(bucket, region, prefix)
+    return s3.obtener_modelo_en_memoria
 
-    def cargar(indicativo: str) -> Any:
-        ruta = os.path.join(ruta_modelos, f"{indicativo}.joblib")
-        if not os.path.exists(ruta):
-            if not s3.descargar_modelo(indicativo, ruta):
-                return None # no esta ni en disco ni en la nube
-        try:
-            return joblib.load(ruta)
-        except FileNotFoundError:
-            return None
-    return cargar
+
+def crear_medidor_tamano_s3(bucket: str, region: str, prefix: str, tamano_defecto_mb: float) -> Callable[[str], float]:
+    # Mide lo que pesa cada modelo preguntando a S3 (sin descargarlo).
+    # Lo usa RegistroModelosLazy para saber cuando va a superar su presupuesto de RAM.
+    from proyecto_aemet_api.ml.s3_storage import S3Storage
+
+    s3 = S3Storage(bucket, region, prefix)
+
+    def tamano(indicativo: str) -> float:
+        medido = s3.obtener_tamano_mb(indicativo)
+        return medido if medido > 0 else tamano_defecto_mb
+    return tamano
 
 
 def crear_medidor_tamano(ruta_modelos: str, tamano_defecto_mb: float) -> Callable[[str], float]:

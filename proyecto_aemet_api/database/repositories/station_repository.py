@@ -6,10 +6,18 @@ import asyncpg
 class StationRepository:
     # Es la capa que habla con la base de datos. El resto del codigo le pide datos a esta clase y no escribe SQL por su cuenta, asi todo el SQL queda en un solo sitio.
 
+    # Solo trae estaciones que tengan datos RECIENTES: la ultima medicion no
+    # puede tener mas de 7 dias (si no, la ventana de 20 dias seria demasiado
+    # vieja para predecir mañana). Usa la vista ultimos_10_dias para ir rapido.
+    #
+    # Ademas, el modelo se filtra aparte: hay estaciones con datos pero sin
+    # modelo entrenado (pocas mediciones historicas). Esas tampoco sirven.
     _QUERY_CON_COORDENADAS = """
-        SELECT indicativo, nombre, provincia, latitud, longitud
-        FROM meteo.estaciones
-        WHERE latitud IS NOT NULL AND longitud IS NOT NULL
+        SELECT DISTINCT e.indicativo, e.nombre, e.provincia, e.latitud, e.longitud
+        FROM meteo.estaciones e
+        JOIN meteo.ultimos_10_dias m ON m.indicativo = e.indicativo
+        WHERE e.latitud IS NOT NULL AND e.longitud IS NOT NULL
+          AND m.tmed IS NOT NULL AND m.hrmedia IS NOT NULL
     """
 
     def __init__(self, pool: asyncpg.Pool) -> None:
