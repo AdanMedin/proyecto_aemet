@@ -21,9 +21,7 @@ __pycache__
 .ruff_cache
 
 # Datos (se montan por volumen en docker-compose.yml)
-proyecto_aemet_api/resources/
-proyecto_aemet_api/ml/artifacts/
-proyecto_aemet_api/ml/artifacts_historicos/
+datos/
 
 # Scripts específicos de AWS (Lambda)
 proyecto_aemet_api/scripts/lambdas/

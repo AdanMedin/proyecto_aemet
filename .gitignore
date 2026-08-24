@@ -1,6 +1,4 @@
-# ============================================================
 # PYTHON
-# ============================================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -43,22 +41,17 @@ htmlcov/
 # Config
 .env
 .env.local
+.env.aws
 .envrc
 
-# ============================================================
-# PROJECT-SPECIFIC
-# ============================================================
+# Ignorar TODO dinamico dentro de datos/:
+datos/*
+datos/MODELOS_RF/modelos_RF/*
+datos/MODELOS_RF/respaldo_RF/*
 
-# Datos descargados (pickles, CSV, JSON)
-proyecto_aemet_api/resources/raw_data*
-proyecto_aemet_api/resources/raw/*
-proyecto_aemet_api/resources/estaciones/*
-proyecto_aemet_api/resources/**/*.csv
-proyecto_aemet_api/resources/**/*.json
-
-# Modelos ML entrenados
-proyecto_aemet_api/ml/artifacts/*
-proyecto_aemet_api/ml/artifacts_historicos/*
+# Datos historicos de referencia en resources/ (CSV/JSON de 10 anos)
+proyecto_aemet_api/resources/*
+!proyecto_aemet_api/resources/.gitkeep
 
 # Pero permitir .gitkeep (mantiene las carpetas en git)
 !**/.gitkeep

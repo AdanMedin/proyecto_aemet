@@ -48,32 +48,32 @@ async def ingestar(
 
     # Cada modo activado se ejecuta y deja su entrada en el resultado.
     if estaciones:
-        # Descarga el inventario, guarda el pickle crudo en estaciones/ (S3 o disco) y,
+        # Descarga el inventario y guarda el pickle crudo en la raiz (S3 o disco) y,
         # si guardar_bd=true, escribe en la tabla meteo.estaciones.
         resultado["estaciones"] = await servicio.cargar_estaciones(
             guardar=guardar_bd,
-            ruta_local=settings.ruta_datos_raw_estaciones,
-            s3_bucket=settings.s3_bucket_datos_raw,
+            ruta_local=settings.ruta_datos,
+            s3_bucket=settings.s3_bucket,
             s3_region=settings.aws_region,
         )
 
     if mediciones:
-        # Descarga el ultimo dia disponible (hoy-5) y lo guarda en raw/<fecha>/.
+        # Descarga el ultimo dia disponible (hoy-5) y lo guarda en la raiz
+        # con nombre "YYYY-MM-DD 00:00:00_YYYY-MM-DDT00:00:00UTC".
         resultado["mediciones"] = await servicio.cargar_mediciones(
             1, 
             guardar=guardar_bd,
-            ruta_local=settings.ruta_datos_raw_mediciones,
-            s3_bucket=settings.s3_bucket_datos_raw,
+            ruta_local=settings.ruta_datos,
+            s3_bucket=settings.s3_bucket,
             s3_region=settings.aws_region,
         )
 
     if historico:
-        # Descarga todo el historico y lo guarda en raw/ (pickle + CSV).
+        # Descarga todo el historico y lo guarda como ALL_10_YEARS (pickle + CSV en local).
         resultado["historico"] = await servicio.cargar_historico_completo(
-            ruta_local=settings.ruta_datos_raw_mediciones,
-            s3_bucket=settings.s3_bucket_datos_raw,
+            ruta_local=settings.ruta_datos,
+            s3_bucket=settings.s3_bucket,
             s3_region=settings.aws_region,
-            s3_prefijo=settings.s3_prefijo_datos_raw,
             guardar=guardar_bd,
         )
 
@@ -127,27 +127,25 @@ async def recargar(
 
     if estaciones:
         resultado["estaciones"] = await servicio.recargar_estaciones_desde_almacenamiento(
-            ruta_local=settings.ruta_datos_raw_estaciones,
-            s3_bucket=settings.s3_bucket_datos_raw,
+            ruta_local=settings.ruta_datos,
+            s3_bucket=settings.s3_bucket,
             s3_region=settings.aws_region,
             guardar=guardar_bd,
         )
 
     if incremental_mediciones:
         resultado["incremental_mediciones"] = await servicio.cargar_mediciones_desde_almacenamiento(
-            ruta_local=settings.ruta_datos_raw_mediciones,
-            s3_bucket=settings.s3_bucket_datos_raw,
+            ruta_local=settings.ruta_datos,
+            s3_bucket=settings.s3_bucket,
             s3_region=settings.aws_region,
-            s3_prefijo=settings.s3_prefijo_datos_raw,
             guardar=guardar_bd,
         )
 
     if historico_mediciones:
         resultado["historico_mediciones"] = await servicio.recargar_mediciones_desde_almacenamiento(
-            ruta_local=settings.ruta_datos_raw_mediciones,
-            s3_bucket=settings.s3_bucket_datos_raw,
+            ruta_local=settings.ruta_datos,
+            s3_bucket=settings.s3_bucket,
             s3_region=settings.aws_region,
-            s3_prefijo=settings.s3_prefijo_datos_raw,
             guardar=guardar_bd,
         )
 

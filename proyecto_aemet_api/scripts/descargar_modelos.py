@@ -4,7 +4,7 @@ Uso:
     python -m proyecto_aemet_api.scripts.descargar_modelos 1690A 3195 8175
 
 Descarga esos modelos a la carpeta configurada en RUTA_MODELOS.
-Despues, quita S3_BUCKET_MODELOS del .env y la API los lee de disco (rapido).
+Despues, quita S3_BUCKET del .env y la API los lee de disco (rapido).
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def main() -> None:
 
     s = get_settings()
     os.makedirs(s.ruta_modelos, exist_ok=True)
-    s3 = S3Storage(s.s3_bucket_modelos, s.aws_region, s.s3_prefijo_modelos)
+    s3 = S3Storage(s.s3_bucket, s.aws_region, s.s3_prefijo_modelos)
 
     for indicativo in indicativos:
         ruta = os.path.join(s.ruta_modelos, f"{indicativo}.joblib")
