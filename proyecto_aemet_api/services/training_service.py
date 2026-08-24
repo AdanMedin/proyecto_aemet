@@ -27,9 +27,9 @@ class TrainingService:
         ruta_salida: str,
         s3_bucket: str,
         aws_region: str,
-        s3_prefijo: str = "modelos",
-        s3_prefijo_historico: str = "modelos_historicos",
-        ruta_historicos: str = "proyecto_aemet_api/ml/artifacts_historicos",
+        s3_prefijo: str = "MODELOS_RF/modelos_RF",
+        s3_prefijo_historico: str = "MODELOS_RF/respaldo_RF",
+        ruta_historicos: str = "datos/MODELOS_RF/respaldo_RF",
     ) -> None:
         # pool = grupo de conexiones a la base de datos ya abiertas.
         # ruta_salida = carpeta donde se guardan los modelos entrenados.

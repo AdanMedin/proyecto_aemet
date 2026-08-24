@@ -22,7 +22,8 @@ class Settings(BaseSettings):
     database_dsn: str
 
     # Carpeta donde estan los modelos entrenados (.joblib), uno por estacion.
-    ruta_modelos: str = "proyecto_aemet_api/ml/artifacts"
+    # Local: datos/MODELOS_RF/modelos_RF/ (espejo de S3). En S3: MODELOS_RF/modelos_RF/
+    ruta_modelos: str = "datos/MODELOS_RF/modelos_RF"
 
     # Presupuesto maximo de RAM (en MB) para tener modelos cargados a la vez.
     modelos_max_memoria_mb: float = 8000.0
@@ -33,37 +34,27 @@ class Settings(BaseSettings):
     # Segundos que la cache de estaciones es valida antes de recargar (TTL).
     estaciones_ttl_segundos: float = 3600.0
 
-    # --- AWS S3 (subida de modelos) ---
-    # Todo esto se lee del .env (aqui no va nada de AWS escrito).
-    # Bucket donde estan los modelos .joblib en la nube. Vacio = desactivado
-    # (los modelos se leen solo del disco local, modo desarrollo).
-    s3_bucket_modelos: str = ""
+    # --- AWS S3 (UN SOLO bucket para todo: aemet-hab-2026) ---
+    # Bucket unico: dentro van mediciones diarias, historico, estaciones y modelos.
+    # Vacio = desactivado (modo desarrollo: todo se lee/guarda en disco local).
+    s3_bucket: str = ""
     aws_region: str = "eu-west-1"
 
-    # Subcarpeta dentro del bucket donde estan los modelos.
-    s3_prefijo_modelos: str = "modelos"
+    # Modelos dentro del bucket: MODELOS_RF/modelos_RF/*.joblib
+    s3_prefijo_modelos: str = "MODELOS_RF/modelos_RF"
 
-    # Subcarpeta de respaldo: aqui se mueven los modelos actuales justo antes
-    # de subir los nuevos (por si algo sale mal). Solo guarda UNA version.
-    s3_prefijo_modelos_historicos: str = "modelos_historicos"
+    # Respaldo: MODELOS_RF/respaldo_RF/ (aqui se mueven los modelos actuales
+    # justo antes de subir los nuevos). Solo guarda UNA version.
+    s3_prefijo_modelos_historicos: str = "MODELOS_RF/respaldo_RF"
 
-    # Carpeta local de respaldo de modelos (mismo comportamiento sin S3).
-    ruta_modelos_historicos: str = "proyecto_aemet_api/ml/artifacts_historicos"
+    # Carpeta local de respaldo de modelos (espejo de S3).
+    ruta_modelos_historicos: str = "datos/MODELOS_RF/respaldo_RF"
 
-    # --- AWS S3 (datos crudos de AEMET) ---
-    # Bucket donde se guardan los pickles con los datos descargados (sin limpiar).
-    # Vacio = no se suben a la nube, se quedan solo en disco local.
-    s3_bucket_datos_raw: str = ""
-    s3_prefijo_datos_raw: str = "raw"
-
-    # Carpeta raiz local para datos: local espeja la estructura de S3
-    # - raw/: mediciones diarias + historico completo
-    # - estaciones/: inventario de estaciones
-    ruta_datos_raw: str = "proyecto_aemet_api/resources"
-    
-    # Subcarpetas especificas (espejo de S3)
-    ruta_datos_raw_mediciones: str = "proyecto_aemet_api/resources/raw"
-    ruta_datos_raw_estaciones: str = "proyecto_aemet_api/resources/estaciones"
+    # --- Datos crudos de AEMET ---
+    # En S3 y en LOCAL van en la RAIZ del bucket/datos/ (sin subcarpetas):
+    #   estaciones.pkl, ALL_10_YEARS, "2026-08-17 00:00:00_2026-08-17T00:00:00UTC"
+    # Local espeja esa misma estructura en la carpeta datos/ de la raiz:
+    ruta_datos: str = "datos"
 
 @lru_cache
 def get_settings() -> Settings:

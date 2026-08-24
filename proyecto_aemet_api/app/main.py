@@ -39,9 +39,9 @@ async def lifespan(app: FastAPI):
     repositorio_estaciones = StationRepository(pool)
 
     # Funcion que dice que estaciones tienen modelo (para filtrar la cache).
-    if settings.s3_bucket_modelos:
+    if settings.s3_bucket:
         from proyecto_aemet_api.ml.s3_storage import S3Storage
-        _s3 = S3Storage(settings.s3_bucket_modelos, settings.aws_region, settings.s3_prefijo_modelos)
+        _s3 = S3Storage(settings.s3_bucket, settings.aws_region, settings.s3_prefijo_modelos)
         listar_modelos = _s3.listar_modelos
     else:
         # En local: las que tengan .joblib en la carpeta de artefactos.
@@ -59,14 +59,14 @@ async def lifespan(app: FastAPI):
     # 3) Registro de modelos de ML con carga perezosa y limite de memoria.
     # Si hay bucket S3 configurado, los modelos se leen de la nube DIRECTO A
     # MEMORIA (sin ocupar disco). Si no, se leen de la carpeta local.
-    if settings.s3_bucket_modelos:
+    if settings.s3_bucket:
         cargador = crear_cargador_con_s3(
-            settings.s3_bucket_modelos,
+            settings.s3_bucket,
             settings.aws_region,
             settings.s3_prefijo_modelos,
         )
         medidor = crear_medidor_tamano_s3(
-            settings.s3_bucket_modelos,
+            settings.s3_bucket,
             settings.aws_region,
             settings.s3_prefijo_modelos,
             settings.modelo_tamano_defecto_mb,
@@ -90,7 +90,7 @@ async def lifespan(app: FastAPI):
     training = TrainingService(
         pool,
         ruta_salida=settings.ruta_modelos,
-        s3_bucket=settings.s3_bucket_modelos,
+        s3_bucket=settings.s3_bucket,
         aws_region=settings.aws_region,
         s3_prefijo=settings.s3_prefijo_modelos,
         s3_prefijo_historico=settings.s3_prefijo_modelos_historicos,

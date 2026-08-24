@@ -48,27 +48,25 @@ class IngestionService:
 
         resultado: dict = {"estaciones": len(limpio)}
 
-        # 3) guarda el pickle crudo en el almacenamiento (prefijo "estaciones").
+        # 3) guarda el pickle crudo en la RAIZ del almacenamiento: estaciones.pkl
         nombre = "estaciones.pkl"
         if s3_bucket:
             s3 = boto3.client("s3", region_name=s3_region)
-            key = f"estaciones/{nombre}"
             # Borra el pickle de estaciones anterior (solo guardamos uno).
-            paginator = s3.get_paginator("list_objects_v2")
-            for page in paginator.paginate(Bucket=s3_bucket, Prefix="estaciones/"):
-                for obj in page.get("Contents", []):
-                    if obj["Key"].endswith(".pkl"):
-                        s3.delete_object(Bucket=s3_bucket, Key=obj["Key"])
+            try:
+                s3.delete_object(Bucket=s3_bucket, Key=nombre)
+            except Exception:
+                pass  # no existia: nada que borrar
             s3.put_object(
                 Bucket=s3_bucket,
-                Key=key,
+                Key=nombre,
                 Body=crudo.to_pickle(None),
                 ContentType="application/octet-stream",
             )
-            resultado["s3_key"] = key
+            resultado["s3_key"] = nombre
         elif ruta_local:
             os.makedirs(ruta_local, exist_ok=True)
-            # Borra el pickle de estaciones anterior (solo guardamos uno).
+            # Borra el pickle/csv de estaciones anterior (solo guardamos uno).
             for f in os.listdir(ruta_local):
                 if f in (nombre, "estaciones.csv"):
                     os.remove(os.path.join(ruta_local, f))
@@ -115,24 +113,23 @@ class IngestionService:
         limpio = self._transformer.transform(crudo)
         resultado["mediciones_limpias"] = len(limpio)
 
-        # Guardar el pickle crudo en raw/<fecha>/mediciones.pkl
+        # Nombre del pickle diario (raiz del bucket, sin subcarpetas):
+        # "2026-08-17 00:00:00_2026-08-17T00:00:00UTC"
+        nombre_diario = f"{fin.isoformat()} 00:00:00_{fin.isoformat()}T00:00:00UTC"
+
         if s3_bucket:
             s3 = boto3.client("s3", region_name=s3_region)
-            fecha_str = fin.isoformat()
-            key = f"raw/{fecha_str}/mediciones.pkl"
             s3.put_object(
                 Bucket=s3_bucket,
-                Key=key,
+                Key=nombre_diario,
                 Body=crudo.to_pickle(None),
                 ContentType="application/octet-stream",
             )
-            resultado["s3_key"] = key
+            resultado["s3_key"] = nombre_diario
         elif ruta_local:
-            fecha_str = fin.isoformat()
-            ruta_fecha = os.path.join(ruta_local, fecha_str)
-            os.makedirs(ruta_fecha, exist_ok=True)
-            ruta_pickle = os.path.join(ruta_fecha, "mediciones.pkl")
-            ruta_csv = os.path.join(ruta_fecha, "mediciones.csv")
+            os.makedirs(ruta_local, exist_ok=True)
+            ruta_pickle = os.path.join(ruta_local, nombre_diario + ".pkl")
+            ruta_csv = os.path.join(ruta_local, nombre_diario + ".csv")
             crudo.to_pickle(ruta_pickle)
             crudo.to_csv(ruta_csv, index=False)  # EN LOCAL GUARDAMOS CSV TAMBIEN
             resultado["ruta_pickle"] = ruta_pickle
@@ -149,7 +146,6 @@ class IngestionService:
         ruta_local: str,
         s3_bucket: str = "",
         s3_region: str = "eu-west-1",
-        s3_prefijo: str = "raw",
         guardar: bool = True,
     ) -> dict:
         # Descarga TODO el historico que da la AEMET (de 15 en 15 dias, por el
@@ -182,39 +178,37 @@ class IngestionService:
 
         resultado = {"registros": len(crudo)}
 
-        # Nombre del archivo: historico_2016-01-01_a_2026-08-23.pkl
-        nombre = f"historico_{inicio.isoformat()}_a_{fin.isoformat()}.pkl"
+        # El historico SIEMPRE se llama ALL_10_YEARS (raiz del bucket / carpeta local).
+        nombre = "ALL_10_YEARS"
 
         if s3_bucket:
-            # Borra historicos viejos de S3 antes de subir el nuevo.
+            # Borra el historico anterior de S3 antes de subir el nuevo
+            # (solo guardamos uno; los pickles diarios NO se tocan).
             s3 = boto3.client("s3", region_name=s3_region)
-            paginator = s3.get_paginator("list_objects_v2")
-            for page in paginator.paginate(Bucket=s3_bucket, Prefix=s3_prefijo):
-                for obj in page.get("Contents", []):
-                    # Solo borra historicos, no los diarios (raw/2026-08-23/...).
-                    if "historico_" in obj["Key"] and obj["Key"].endswith(".pkl"):
-                        s3.delete_object(Bucket=s3_bucket, Key=obj["Key"])
+            try:
+                s3.delete_object(Bucket=s3_bucket, Key=nombre)
+            except Exception:
+                pass  # no existia: nada que borrar
 
-            # Sube el pickle nuevo a S3.
-            key = f"{s3_prefijo}/{nombre}"
+            # Sube el pickle nuevo a la raiz del bucket.
             s3.put_object(
                 Bucket=s3_bucket,
-                Key=key,
+                Key=nombre,
                 Body=crudo.to_pickle(None),
                 ContentType="application/octet-stream",
             )
-            resultado["s3_key"] = key
+            resultado["s3_key"] = nombre
             resultado["guardado"] = True
         else:
             # Borra historicos viejos de la carpeta local.
             os.makedirs(ruta_local, exist_ok=True)
             for f in os.listdir(ruta_local):
-                if f.startswith("historico_") and (f.endswith(".pkl") or f.endswith(".csv")):
+                if f.startswith(nombre) and (f.endswith(".pkl") or f.endswith(".csv")):
                     os.remove(os.path.join(ruta_local, f))
 
             # Guarda en disco local: pickle (para procesar) y CSV (para ver).
-            ruta_pickle = os.path.join(ruta_local, nombre)
-            ruta_csv = os.path.join(ruta_local, nombre.replace(".pkl", ".csv"))
+            ruta_pickle = os.path.join(ruta_local, nombre + ".pkl")
+            ruta_csv = os.path.join(ruta_local, nombre + ".csv")
             crudo.to_pickle(ruta_pickle)
             crudo.to_csv(ruta_csv, index=False)
             resultado["ruta_pickle"] = ruta_pickle
@@ -234,7 +228,6 @@ class IngestionService:
         ruta_local: str,
         s3_bucket: str = "",
         s3_region: str = "eu-west-1",
-        s3_prefijo: str = "raw",
         guardar: bool = True,
     ) -> dict:
         # Lee los pickles diarios guardados en el almacenamiento (S3 o disco
@@ -255,31 +248,33 @@ class IngestionService:
             )
 
         # 2) Lista los pickles diarios que hay en el almacenamiento.
-        #    Cada pickle es de UN dia: raw/2026-08-23/mediciones.pkl
+        #    Cada pickle es de UN dia, en la RAIZ, con nombre:
+        #    "2026-08-17 00:00:00_2026-08-17T00:00:00UTC"
         dias_disponibles = []
         if s3_bucket:
             s3 = boto3.client("s3", region_name=s3_region)
             paginator = s3.get_paginator("list_objects_v2")
-            for page in paginator.paginate(Bucket=s3_bucket, Prefix=s3_prefijo + "/"):
+            for page in paginator.paginate(Bucket=s3_bucket):
                 for obj in page.get("Contents", []):
                     key = obj["Key"]
-                    # raw/2026-08-23/mediciones.pkl -> 2026-08-23
-                    partes = key.split("/")
-                    if len(partes) >= 3 and partes[-1] == "mediciones.pkl":
-                        try:
-                            dia = date.fromisoformat(partes[1])
-                            dias_disponibles.append((dia, key))
-                        except ValueError:
-                            pass  # no es una fecha, lo ignora
+                    # Solo objetos de la RAIZ (sin "/") con nombre de fecha.
+                    if "/" in key:
+                        continue
+                    try:
+                        dia = date.fromisoformat(key[:10])
+                        dias_disponibles.append((dia, key))
+                    except ValueError:
+                        pass  # no empieza por fecha: ALL_10_YEARS, estaciones.pkl...
         else:
-            # Local: recorre la carpeta buscando subcarpetas con fecha.
+            # Local: archivos .pkl en la raiz cuyo nombre empieza por fecha ISO.
             if os.path.isdir(ruta_local):
                 for nombre in os.listdir(ruta_local):
+                    ruta = os.path.join(ruta_local, nombre)
+                    if not (os.path.isfile(ruta) and nombre.endswith(".pkl")):
+                        continue
                     try:
-                        dia = date.fromisoformat(nombre)
-                        ruta_pickle = os.path.join(ruta_local, nombre, "mediciones.pkl")
-                        if os.path.isfile(ruta_pickle):
-                            dias_disponibles.append((dia, ruta_pickle))
+                        dia = date.fromisoformat(nombre[:10])
+                        dias_disponibles.append((dia, ruta))
                     except ValueError:
                         pass
 
@@ -325,7 +320,6 @@ class IngestionService:
         ruta_local: str,
         s3_bucket: str = "",
         s3_region: str = "eu-west-1",
-        s3_prefijo: str = "raw",
         guardar: bool = True,
     ) -> dict:
         # Carga en la BD TODO el historico de mediciones que haya guardado en
@@ -343,27 +337,31 @@ class IngestionService:
         import boto3
         import pandas as pd
 
-        # 1) Lista TODOS los pickles que hay (diarios y el historico completo).
+        # 1) Lista TODOS los pickles de mediciones (diarios + ALL_10_YEARS).
+        #    Todo esta en la RAIZ: keys sin "/" excepto las carpetas MODELOS_RF/.
         origenes: list[str] = []
         if s3_bucket:
             s3 = boto3.client("s3", region_name=s3_region)
             paginator = s3.get_paginator("list_objects_v2")
-            for page in paginator.paginate(Bucket=s3_bucket, Prefix=s3_prefijo + "/"):
+            for page in paginator.paginate(Bucket=s3_bucket):
                 for obj in page.get("Contents", []):
-                    if obj["Key"].endswith(".pkl"):
-                        origenes.append(obj["Key"])
+                    key = obj["Key"]
+                    if "/" in key:
+                        continue  # carpetas (MODELOS_RF/...): no son datos
+                    if key in ("estaciones.pkl", "estaciones.csv", "LAST_UPDATE.txt"):
+                        continue  # no son mediciones
+                    if key == "ALL_10_YEARS" or key[:10].count("-") == 2:
+                        origenes.append(key)  # historico o pickle diario
         else:
-            # Local: pickles sueltos en la carpeta (historico_*.pkl) y pickles
-            # diarios en subcarpetas por fecha (<fecha>/mediciones.pkl).
+            # Local: pickles en la raiz (diarios + ALL_10_YEARS.pkl).
             if os.path.isdir(ruta_local):
                 for nombre in os.listdir(ruta_local):
                     ruta = os.path.join(ruta_local, nombre)
-                    if os.path.isfile(ruta) and nombre.endswith(".pkl"):
-                        origenes.append(ruta)
-                    elif os.path.isdir(ruta):
-                        ruta_diaria = os.path.join(ruta, "mediciones.pkl")
-                        if os.path.isfile(ruta_diaria):
-                            origenes.append(ruta_diaria)
+                    if not (os.path.isfile(ruta) and nombre.endswith(".pkl")):
+                        continue
+                    if nombre == "estaciones.pkl":
+                        continue
+                    origenes.append(ruta)
 
         # 2) Lee cada pickle, limpia y carga en la BD (si se pidio guardar).
         total = 0
@@ -404,10 +402,10 @@ class IngestionService:
         import boto3
         import pandas as pd
 
-        # 1) Localiza el pickle de estaciones (solo guardamos uno: estaciones.pkl).
+        # 1) Localiza el pickle de estaciones (raiz del bucket: estaciones.pkl).
         if s3_bucket:
             s3 = boto3.client("s3", region_name=s3_region)
-            key = "estaciones/estaciones.pkl"
+            key = "estaciones.pkl"
             try:
                 resp = s3.get_object(Bucket=s3_bucket, Key=key)
             except Exception:
