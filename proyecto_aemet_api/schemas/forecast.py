@@ -6,10 +6,12 @@ from pydantic import BaseModel
 
 # Lo que el cliente envia al pedir una prediccion (entrada). Pydantic valida automaticamente que lleguen los tipos correctos.
 class PrediccionRequest(BaseModel):
-    latitud: float
-    longitud: float
+    # latitud: float
+    # longitud: float
+    municipio: str
     k: int = 5 # cuantas estaciones cercanas devolver
     max_distancia_km: float = 50.0  # radio maximo de busqueda
+
 
 # Lo que la API DEVUELVE por cada estacion encontrada (salida).
 class EstacionCercanaOut(BaseModel):
@@ -35,6 +37,8 @@ class PrediccionTemperaturaOut(BaseModel):
 # Respuesta completa del endpoint de prediccion: las estaciones con su
 # prediccion individual + la temperatura media ponderada por distancia.
 class PrediccionResponse(BaseModel):
+    municipio: str
+    provincia: str
     fecha: date  # dia predicho (mañana)
     # Media ponderada: cada estacion pesa 1/distancia (mas cerca = mas peso).
     # Asi una estacion a 1km influye 10 veces mas que una a 10km.

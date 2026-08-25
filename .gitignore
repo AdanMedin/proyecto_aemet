@@ -48,6 +48,9 @@ htmlcov/
 datos/*
 datos/MODELOS_RF/modelos_RF/*
 datos/MODELOS_RF/respaldo_RF/*
+modelos_RF/*
+modelos_GB/*
+ALL_10_YEARS
 
 # Datos historicos de referencia en resources/ (CSV/JSON de 10 anos)
 proyecto_aemet_api/resources/*

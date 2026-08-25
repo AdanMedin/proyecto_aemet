@@ -1,6 +1,7 @@
 """Endpoint de predicción de temperatura."""
 
 from __future__ import annotations
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException
 from proyecto_aemet_api.app.dependencies import get_predictor
 from proyecto_aemet_api.schemas.forecast import (
@@ -9,6 +10,7 @@ from proyecto_aemet_api.schemas.forecast import (
     PrediccionTemperaturaOut,
 )
 from proyecto_aemet_api.services.forecast_service import PredictorMeteo
+from proyecto_aemet_api.services.coordenadas_service import obtener_coordenadas
 
 router = APIRouter()
 
@@ -18,11 +20,31 @@ async def prediccion(
     predictor: PredictorMeteo = Depends(get_predictor),
 ):
     # Depends(get_predictor) = "antes de ejecutar esto, dame el predictor".
+    # resultados = await predictor.predecir_temperatura(
+    #     latitud=req.latitud,
+    #     longitud=req.longitud,
+    #     k=req.k,
+    #     max_distancia_km=req.max_distancia_km,
+    #)
+
+     # Convertimos el nombre del municipio en coordenadas
+    try:
+        coordenadas = await asyncio.to_thread(
+            obtener_coordenadas,
+            req.municipio
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se han podido obtener las coordenadas del municipio: {e}",
+        )
+
     resultados = await predictor.predecir_temperatura(
-        latitud=req.latitud,
-        longitud=req.longitud,
-        k=req.k,
-        max_distancia_km=req.max_distancia_km,
+        latitud=coordenadas.latitud,
+        longitud=coordenadas.longitud,
+        #k=req.k,
+        #max_distancia_km=req.max_distancia_km,
     )
 
     if not resultados:
@@ -64,7 +86,9 @@ async def prediccion(
         ) / suma_pesos
 
     return PrediccionResponse(
-        fecha=estaciones[0].fecha,  # todas predicen el mismo dia (mañana)
-        temperatura_ponderada=round(temperatura_ponderada, 1),
+        municipio=coordenadas.municipio,
+        provincia=coordenadas.provincia,
+        fecha=estaciones[0].fecha,
+        temperatura_ponderada=round(temperatura_ponderada,1,),
         estaciones=estaciones,
-    )
+)

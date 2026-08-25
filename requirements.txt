@@ -35,3 +35,7 @@ ipykernel
 # --- Tests ---
 pytest
 httpx
+
+#--- LLM ---
+langchain 
+langchain-google-genai
