@@ -59,7 +59,7 @@ if st.button("Consultar predicción"):
             elif response.status_code == 404:
                 st.error(
                     "No se ha encontrado una predicción disponible para ese municipio.\n\n"
-                    "Por favor, tenga en cuenta que el municipio debe pertener al reino de España"
+                    "Por favor, tenga en cuenta que el municipio debe pertener al reino de España."
                 )
             else:
                 st.error(f"Error al consultar la API: {response.status_code}")
