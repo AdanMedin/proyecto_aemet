@@ -20,6 +20,18 @@ class StationRepository:
           AND m.tmed IS NOT NULL AND m.hrmedia IS NOT NULL
     """
 
+     # Trae todas las estaciones con coordenadas.
+    # Se utiliza en el endpoint EDA porque puede consultar
+    # periodos históricos aunque la estación ya no tenga
+    # mediciones recientes.
+    _QUERY_TODAS_CON_COORDENADAS = """
+        SELECT
+            indicativo, nombre, provincia, latitud, longitud
+        FROM meteo.estaciones
+        WHERE latitud IS NOT NULL
+          AND longitud IS NOT NULL
+    """
+
     def __init__(self, pool: asyncpg.Pool) -> None:
         self._pool = pool
 
@@ -27,3 +39,11 @@ class StationRepository:
         # Pide prestada una conexion del pool, lanza la consulta y devuelve todas las filas (cada fila es una estacion con sus coordenadas).
         async with self._pool.acquire() as connection:
             return await connection.fetch(self._QUERY_CON_COORDENADAS)
+
+    async def obtener_todas_estaciones_con_coordenadas(
+        self,
+    ) -> list[asyncpg.Record]:
+        async with self._pool.acquire() as connection:
+            return await connection.fetch(
+                self._QUERY_TODAS_CON_COORDENADAS
+            )

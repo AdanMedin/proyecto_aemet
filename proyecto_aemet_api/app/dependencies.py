@@ -3,10 +3,19 @@
 from __future__ import annotations
 from fastapi import Request
 from proyecto_aemet_api.services.forecast_service import PredictorMeteo
+from proyecto_aemet_api.services.eda_service import EDAService
 
-    # FastAPI llamara a esta funcion y pasara su resultado al endpoint que la pida.
-    # El predictor se creo una sola vez al arrancar y vive en app.state, asi que aqui solo lo recuperamos.
-    # Se podría crear directasmente en la clase forecast.py, pero asi queda mas ordenado y desacoplado si en un futuro necesitamos utilizar el método get_predictor para otros endpoints o servicios.
-def get_predictor(request: Request) -> PredictorMeteo:
+# FastAPI llamará a esta función y pasará su resultado al endpoint que la pida.
+# El predictor se creó una sola vez al arrancar y vive en app.state.
 
+def get_predictor(
+    request: Request,
+) -> PredictorMeteo:
     return request.app.state.predictor
+
+# Servicio EDA creado al arrancar la aplicación.
+# Igual que el predictor, únicamente lo recuperamos desde app.state.
+def get_eda_service(
+    request: Request,
+) -> EDAService:
+    return request.app.state.eda_service

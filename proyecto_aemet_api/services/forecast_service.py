@@ -5,7 +5,7 @@ import asyncio
 import time
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Optional
+from typing import Optional, Callable
 import numpy as np
 from proyecto_aemet_api.database.repositories.observation_repository import (
     ObservationRepository,
@@ -85,19 +85,25 @@ class CacheEstaciones:
         repositorio: StationRepository,
         ttl_segundos: float = 3600.0,
         listar_modelos: Callable[[], set[str]] | None = None,
+        usar_todas_estaciones: bool = False
     ) -> None:
         self._repositorio = repositorio # de aqui saca las estaciones (capa BD)
         self._ttl = ttl_segundos
         # Funcion que devuelve los indicativos de las estaciones con modelo.
         # Si no se pasa, no filtra por modelo (todas las estaciones con datos).
+        
         self._listar_modelos = listar_modelos
+        self._usar_todas_estaciones = usar_todas_estaciones
         self._data: Optional[_EstacionesData] = None
         self._cargado_en = 0.0
         self._lock = asyncio.Lock() # evita recargas simultaneas que se pisen
 
     async def _cargar(self) -> None:
-        # Pide las estaciones al repositorio y las convierte en arrays de numpy.
-        rows = await self._repositorio.obtener_estaciones_con_coordenadas()
+
+        if self._usar_todas_estaciones:
+            rows = await self._repositorio.obtener_todas_estaciones_con_coordenadas()
+        else:
+            rows = await self._repositorio.obtener_estaciones_con_coordenadas()
 
         # Filtra: solo estaciones que tengan modelo entrenado.
         if self._listar_modelos is not None:
