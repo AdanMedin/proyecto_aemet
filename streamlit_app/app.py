@@ -18,7 +18,7 @@ st.title("🌤️ Proyecto predicción de temepratura dai08rt de Hack a BOSS")
 
 st.write(
     """
-    Bienvenido a la APP APP Nubes y Claros.\n
+    Bienvenido a la APP Nubes y Claros.\n
     Esta aplicación permite obtener una predicción de la
     **temperatura media de mañana** para una localidad de España.
     Introduce el nombre del municipio que quieres consultar.
