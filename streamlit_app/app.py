@@ -82,7 +82,7 @@ st.subheader("📊 Histórico de temperaturas")
 
 st.write(
     """
-    En esta sección puede consultar los datos históricos de temperatura media diária en un intervalo de tiempo contínuo.\n 
+    En esta sección puede consultar los datos históricos de temperatura media diaria en un intervalo de tiempo contínuo.\n 
     El intervalo tiene que ser desde los últimos 10 años y hasta hace 5 días.
     """
 )
