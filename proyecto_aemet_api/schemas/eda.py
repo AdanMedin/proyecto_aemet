@@ -1,7 +1,7 @@
 """Esquemas Pydantic para consultas históricas EDA."""
 
 from datetime import date
-
+from typing import Optional
 from pydantic import BaseModel
 
 
@@ -26,7 +26,7 @@ class ConsultaEDACompleta(BaseModel):
 
 class TemperaturaHistoricaOut(BaseModel):
     fecha: date
-    temperatura_media: float | None
+    temperatura_media: Optional[float]
 
 
 class EDAResponse(BaseModel):
