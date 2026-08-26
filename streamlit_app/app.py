@@ -8,22 +8,24 @@ API_URL = "http://127.0.0.1:8000/api/v1/prediccion"
 #API_URL_EC2 = os.environ.get("API_BASE_URL")
 
 st.set_page_config(
-    page_title="Predicción meteorológica",
+    page_title="APP Nubes y Claros",
     page_icon="🌤️",
+    layout="wide",
 )
 
-st.title("🌤️ Predicción de temperatura")
+st.title("🌤️ Proyecto predicción de temepratura dai08rt de Hack a BOSS")
 
 st.write(
     """
-    Bienvenido. Esta aplicación permite obtener una predicción de la
+    Bienvenido a la APP APP Nubes y Claros.\n
+    Esta aplicación permite obtener una predicción de la
     **temperatura media de mañana** para una localidad de España.
     Introduce el nombre del municipio que quieres consultar.
     """
 )
 
 municipio = st.text_input(
-    "Municipio",
+    "Municipio:",
     placeholder="Por ejemplo: Zuera, provincia de Zaragoza",
 )
 
@@ -52,7 +54,7 @@ if st.button("Consultar predicción"):
                     f"es de **{temperatura} ºC**."
                 )
 
-                st.write("¿Desea realizar otra consulta?")
+                
 
             elif response.status_code == 404:
                 st.error(
