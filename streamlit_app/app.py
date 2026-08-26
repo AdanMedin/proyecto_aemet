@@ -14,7 +14,7 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("🌤️ Proyecto predicción de temepratura dai08rt de Hack a BOSS")
+st.title("🌤️ Proyecto predicción de temperatura dai08rt de Hack a BOSS")
 
 st.write(
     """
