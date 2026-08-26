@@ -1,9 +1,11 @@
 """Aplicación web en Streamlit."""
 import streamlit as st
-
+import os
 import requests
 
-API_URL = "http://127.0.0.1:8000/api/v1/prediccion"
+
+#API_URL = "http://127.0.0.1:8000/api/v1/prediccion"
+API_URL_EC2 = os.environ.get("API_BASE_URL")
 
 st.set_page_config(
     page_title="Predicción meteorológica",
@@ -34,7 +36,7 @@ if st.button("Consultar predicción"):
         }
         try:
             response = requests.post(
-                API_URL,
+                API_URL_EC2,
                 json=payload,
                 timeout=60,
             )
