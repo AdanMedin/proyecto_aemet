@@ -21,6 +21,7 @@ from proyecto_aemet_api.ml.predictor import (
     crear_medidor_tamano_s3,
 )
 from proyecto_aemet_api.services.forecast_service import CacheEstaciones, PredictorMeteo
+from proyecto_aemet_api.services.eda_service import EDAService
 from proyecto_aemet_api.services.ingestion_service import IngestionService
 from proyecto_aemet_api.services.training_service import TrainingService
 
@@ -54,6 +55,14 @@ async def lifespan(app: FastAPI):
         ttl_segundos=settings.estaciones_ttl_segundos,
         listar_modelos=listar_modelos,
     )
+
+    cache_estaciones_eda = CacheEstaciones(
+        repositorio_estaciones,
+        ttl_segundos=settings.estaciones_ttl_segundos,
+        listar_modelos=None,
+        usar_todas_estaciones=True,
+    )
+
     repositorio_mediciones = ObservationRepository(pool)
 
     # 3) Registro de modelos de ML con carga perezosa y limite de memoria.
@@ -85,6 +94,10 @@ async def lifespan(app: FastAPI):
     # 4) Servicio que junta cache de estaciones, modelos y mediciones de la BD.
     predictor = PredictorMeteo(cache_estaciones, registro_modelos, repositorio_mediciones)
 
+    # <<< NUEVO >>>
+
+    eda_service = EDAService(observation_repository=repositorio_mediciones, cache_estaciones=cache_estaciones_eda,)
+
     # 5) Servicios de operaciones: ingesta (AEMET -> BD) y reentrenamiento (BD -> modelos).
     ingestion = IngestionService(DataLoader(pool))
     training = TrainingService(
@@ -101,6 +114,7 @@ async def lifespan(app: FastAPI):
     # Esto guarda el pool de conexiones y el predictor(cache con estaciones cercanas + modelos) en el estado global de la aplicación, para poder acceder a ellos desde cualquier endpoint sin tener que recrearlos en cada petición.
     app.state.pool = pool
     app.state.predictor = predictor
+    app.state.eda_service = eda_service
     app.state.ingestion = ingestion
     app.state.training = training
     app.state.settings = settings  # los endpoints de admin lo usan para rutas y buckets
