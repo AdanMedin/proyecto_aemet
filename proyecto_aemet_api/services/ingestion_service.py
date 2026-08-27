@@ -1,6 +1,6 @@
 """Servicio de ingesta: descarga AEMET, limpia y carga en PostgreSQL."""
 from __future__ import annotations
-
+from io import BytesIO
 from datetime import date, timedelta
 
 from proyecto_aemet_api.ingestion.aemet_client import AemetClient
@@ -57,12 +57,24 @@ class IngestionService:
                 s3.delete_object(Bucket=s3_bucket, Key=nombre)
             except Exception:
                 pass  # no existia: nada que borrar
+            # s3.put_object(
+            #     Bucket=s3_bucket,
+            #     Key=nombre,
+            #     Body=crudo.to_pickle(None),
+            #     ContentType="application/octet-stream",
+            # )
+            buffer = BytesIO()
+            crudo.to_pickle(buffer)
             s3.put_object(
                 Bucket=s3_bucket,
                 Key=nombre,
-                Body=crudo.to_pickle(None),
+                Body=buffer.getvalue(),
                 ContentType="application/octet-stream",
             )
+
+
+
+
             resultado["s3_key"] = nombre
         elif ruta_local:
             os.makedirs(ruta_local, exist_ok=True)
@@ -119,12 +131,24 @@ class IngestionService:
 
         if s3_bucket:
             s3 = boto3.client("s3", region_name=s3_region)
+            # s3.put_object(
+            #     Bucket=s3_bucket,
+            #     Key=nombre_diario,
+            #     Body=crudo.to_pickle(None),
+            #     ContentType="application/octet-stream",
+            # )
+            buffer = BytesIO()
+            crudo.to_pickle(buffer)
             s3.put_object(
                 Bucket=s3_bucket,
                 Key=nombre_diario,
-                Body=crudo.to_pickle(None),
+                Body=buffer.getvalue(),
                 ContentType="application/octet-stream",
             )
+
+
+
+
             resultado["s3_key"] = nombre_diario
         elif ruta_local:
             os.makedirs(ruta_local, exist_ok=True)
@@ -191,12 +215,22 @@ class IngestionService:
                 pass  # no existia: nada que borrar
 
             # Sube el pickle nuevo a la raiz del bucket.
+            # s3.put_object(
+            #     Bucket=s3_bucket,
+            #     Key=nombre,
+            #     Body=crudo.to_pickle(None),
+            #     ContentType="application/octet-stream",
+            # )
+            buffer = BytesIO()
+            crudo.to_pickle(buffer)
             s3.put_object(
                 Bucket=s3_bucket,
                 Key=nombre,
-                Body=crudo.to_pickle(None),
-                ContentType="application/octet-stream",
+                Body=buffer.getvalue(),
             )
+
+
+
             resultado["s3_key"] = nombre
             resultado["guardado"] = True
         else:
