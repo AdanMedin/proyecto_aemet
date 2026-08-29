@@ -46,8 +46,8 @@ las que tienen datos recientes Y modelo entrenado).
 **2. Mediciones (todos los días, 3:00 AM)**
 
 ```
-cron -> POST /api/v1/admin/ingestar?dias=1&guardar_bd=true
-        -> IngestionService.cargar_mediciones(dias=1)
+cron -> POST /api/v1/admin/ingestar?mediciones=true&guardar_bd=true
+        -> IngestionService.cargar_mediciones(1)
             -> AemetClient.obtener_mediciones(hoy-5, hoy-5)  (SOLO el último
                                                               día publicado)
             -> DataTransformer.transform  (limpia: "Ip" -> 0.05,
@@ -58,8 +58,10 @@ cron -> POST /api/v1/admin/ingestar?dias=1&guardar_bd=true
 
 Por qué hoy-5: la AEMET tarda unos 5 días en publicar los datos definitivos de
 un día. Cada día se pide el día que acaba de quedar disponible. Si un día falla
-la descarga, se puede recuperar llamando a mano con `dias=N` y el upsert
-(`ON CONFLICT`) evita duplicados.
+la descarga, se puede recuperar después con
+`/admin/recargar?incremental_mediciones=true` (lee los pickles guardados y carga
+solo los días que falten en la BD), y el upsert (`ON CONFLICT`) evita
+duplicados.
 
 **3. Entrenamiento (día 1 de enero y julio, 4:00 AM — cada 6 meses)**
 
@@ -86,10 +88,14 @@ que va a tener que hacer.
 **4. Predicción (cuando alguien llama a la API)**
 
 ```
-POST /api/v1/prediccion {latitud, longitud, k, max_distancia_km}
+POST /api/v1/prediccion {municipio: "Zuera, provincia de Zaragoza"}
+    -> coordenadas_service: el modelo Gemini de Google convierte el nombre
+       del municipio en coordenadas (latitud/longitud de su centro) y
+       devuelve además el nombre oficial y la provincia.
     -> CacheEstaciones: busca las estaciones más cercanas (distancia
-       Haversine, calculada en memoria sin tocar la BD). Solo estaciones con
-       datos recientes (última medición de hace 7 días como mucho) Y modelo.
+       Haversine, calculada en memoria sin tocar la BD; las 5 más cercanas
+       en un radio de 50 km). Solo estaciones con datos recientes (última
+       medición de hace 7 días como mucho) Y modelo.
     -> RegistroModelosLazy: carga el modelo de cada estación la primera vez
        que se pide y lo mantiene en RAM. Si hay S3 configurado, lo descarga
        de la nube DIRECTO A MEMORIA (sin tocar el disco).
@@ -100,6 +106,25 @@ POST /api/v1/prediccion {latitud, longitud, k, max_distancia_km}
     -> La respuesta incluye además la temperatura ponderada por distancia
        (1/distancia). Si hay alguna estación a menos de 0.5 km, se devuelve
        directamente la de esa estación, sin mezclar.
+```
+
+**5. Consulta histórica en lenguaje natural (endpoint /eda)**
+
+```
+POST /api/v1/eda {consulta: "temperatura media de Barajas de marzo a junio de 2020"}
+    -> EDAService: Gemini extrae de la frase el municipio y las fechas de
+       inicio y fin. Después se validan: el inicio no puede ser posterior al
+       fin, y el rango tiene que estar dentro de lo disponible (últimos 10
+       años, hasta hoy-5).
+    -> coordenadas_service: convierte el municipio en coordenadas.
+    -> CacheEstaciones en modo EDA: aquí se usan TODAS las estaciones con
+       datos recientes, tengan o no modelo (las 5 más cercanas en un radio
+       de 100 km).
+    -> ObservationRepository: lee las temperaturas medias diarias de esas
+       estaciones en el periodo pedido.
+    -> Para cada día se mezclan las estaciones ponderando por 1/distancia.
+    -> Devuelve la serie fecha -> temperatura media, que es la que la web
+       dibuja como gráfica.
 ```
 
 ---
@@ -121,7 +146,7 @@ reprocesar sin volver a pedirlo a la AEMET.
 
 Los pickles diarios se guardan SIEMPRE (a modo de copia de seguridad: si algún
 día falla la carga en la BD, el dato sigue en S3 y se puede recuperar con el
-modo `desde_almacenamiento` de la API).
+endpoint `/admin/recargar` de la API).
 
 ### Piezas
 
@@ -309,7 +334,7 @@ normal es un rol IAM en vez de claves).
 
 | Tarea | Local | AWS |
 |---|---|---|
-| Mediciones | cron diario -> API (`dias=1`) | lambda_ingesta_aemet + lambda_procesamiento_ingesta |
+| Mediciones | cron diario -> API (`mediciones=true`) | lambda_ingesta_aemet + lambda_procesamiento_ingesta |
 | Estaciones | cron mensual -> API (`estaciones=true`) | lambda_ingesta_estaciones + lambda_procesamiento_estaciones |
 | Entrenamiento | cron 6 meses -> API | lambda_entrenamiento_standalone |
 | Modelos | disco (ml/artifacts) con respaldo en artifacts_historicos | S3, la API los descarga a memoria bajo demanda; respaldo en carpeta histórica |
@@ -327,12 +352,26 @@ Todas las pruebas se pueden hacer con `curl` (o Postman, o el propio Swagger en
 ```bash
 curl -X POST http://localhost:8000/api/v1/prediccion \
   -H "Content-Type: application/json" \
-  -d '{"latitud": 42.336388, "longitud": -7.863333, "k": 5, "max_distancia_km": 100}'
+  -d '{"municipio": "Zuera, provincia de Zaragoza"}'
 ```
 
-Devuelve la fecha predicha (mañana), la temperatura ponderada por distancia, y
-el detalle de cada estación usada. Si el punto está a menos de 0.5 km de una
-estación, la ponderada es directamente la de esa estación.
+Devuelve el municipio y la provincia interpretados, la fecha predicha (mañana),
+la temperatura ponderada por distancia, y el detalle de cada estación usada. Si
+el punto está a menos de 0.5 km de una estación, la ponderada es directamente la
+de esa estación.
+
+### Consulta histórica (lenguaje natural)
+
+```bash
+curl -X POST http://localhost:8000/api/v1/eda \
+  -H "Content-Type: application/json" \
+  -d '{"consulta": "temperatura media de Barajas de marzo a junio de 2020"}'
+```
+
+Devuelve el municipio, la provincia y el rango de fechas interpretados, y la
+serie diaria de temperatura media (ponderada entre las estaciones cercanas).
+Si la consulta no se puede interpretar o las fechas están fuera de rango,
+responde 400 con el motivo.
 
 ### Ingesta (modos, combinables)
 
@@ -345,10 +384,7 @@ probar sin riesgo).
 curl -X POST "http://localhost:8000/api/v1/admin/ingestar?estaciones=true&guardar_bd=true"
 
 # Último día disponible (hoy-5), escribiendo en la BD — lo que hace el cron diario
-curl -X POST "http://localhost:8000/api/v1/admin/ingestar?dias=1&guardar_bd=true"
-
-# Últimos 30 días disponibles, sin escribir (prueba)
-curl -X POST "http://localhost:8000/api/v1/admin/ingestar?dias=30"
+curl -X POST "http://localhost:8000/api/v1/admin/ingestar?mediciones=true&guardar_bd=true"
 
 # Histórico completo desde 2016: descarga y guarda pickle (S3 o disco+CSV)
 curl -X POST "http://localhost:8000/api/v1/admin/ingestar?historico=true"
@@ -357,7 +393,7 @@ curl -X POST "http://localhost:8000/api/v1/admin/ingestar?historico=true"
 curl -X POST "http://localhost:8000/api/v1/admin/ingestar?historico=true&guardar_bd=true"
 
 # Combinado: estaciones + último día, todo escribiendo
-curl -X POST "http://localhost:8000/api/v1/admin/ingestar?estaciones=true&dias=1&guardar_bd=true"
+curl -X POST "http://localhost:8000/api/v1/admin/ingestar?estaciones=true&mediciones=true&guardar_bd=true"
 ```
 
 ### Recarga desde el almacenamiento
