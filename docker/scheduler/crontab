@@ -4,13 +4,13 @@
 
 # TAREA 1: Descargar las mediciones diarias de AEMET (ingesta)
 # Ejecuta: todos los dias a las 3:00 AM
-# Qué hace: llama a la API con dias=1, que descarga SOLO las mediciones
+# Qué hace: llama a la API con mediciones=true, que descarga SOLO las mediciones
 # del ultimo dia publicado (hoy menos 5; la AEMET tarda unos 5 dias en subir
 # los datos definitivos de un dia).
 # (En AWS hace lo mismo la Lambda diaria lambda_ingesta_aemet.)
 # Logs: guarda todo en /var/log/ingesta.log
 
-0 3 * * * curl -sf -X POST "http://api:8000/api/v1/admin/ingestar?dias=1&guardar_bd=true" >> /var/log/ingesta.log 2>&1
+0 3 * * * curl -sf -X POST "http://api:8000/api/v1/admin/ingestar?mediciones=true&guardar_bd=true" >> /var/log/ingesta.log 2>&1
 
 # TAREA 2: Actualizar el inventario de estaciones
 # Ejecuta: el día 1 de cada mes a las 2:00 AM

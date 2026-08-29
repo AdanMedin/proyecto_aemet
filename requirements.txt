@@ -37,5 +37,6 @@ pytest
 httpx
 
 #--- LLM ---
+google-genai
 langchain 
 langchain-google-genai
